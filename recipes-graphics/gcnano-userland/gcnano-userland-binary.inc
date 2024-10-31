@@ -5,13 +5,21 @@ LIC_FILES_CHKSUM = "file://${GCNANO_TAR_FILENAME}/LICENSE;md5=0e85fa534ee3a1a7f5
 
 DEPENDS += " libdrm wayland "
 
-SRC_URI = "git://github.com/STMicroelectronics/gcnano-binaries;protocol=https;branch=gcnano-${GCNANO_VERSION}-binaries"
-SRCREV = "5d02efd5cb4cfa85307633891f3cf87550a8bc1d"
+SRC_URI = "git://github.com/STMicroelectronics/gcnano-binaries.git;protocol=https;branch=gcnano-${GCNANO_VERSION}-binaries"
+SRCREV = "359d5007ef19575f6b8ca3071cf90d3848778ae7"
 
 PV = "${GCNANO_VERSION}+${GCNANO_DATE}"
 
-GCNANO_VERSION = "6.4.13"
-GCNANO_DATE = "20230517"
+GCNANO_VERSION = "6.4.19"
+
+GCNANO_DATE:stm32mp1common = "20240911"
+GCNANO_DATE:stm32mp2common = "20240911"
+
+GCNANO_PACKAGECONFIG = "egl gbm glesv1 glesv2 vg"
+
+GCNANO_PACKAGECONFIG:append = " ${@bb.utils.contains('MACHINE_FEATURES', 'openvx', 'vx', '', d)}"
+GCNANO_PACKAGECONFIG:append = " ${@bb.utils.contains('MACHINE_FEATURES', 'opencl', 'cl', '', d)}"
+GCNANO_PACKAGECONFIG:append = " ${@bb.utils.contains('MACHINE_FEATURES', 'vulkan', 'vulkan', '', d)}"
 
 S = "${WORKDIR}/git"
 B = "${S}/${GCNANO_TAR_FILENAME}"
