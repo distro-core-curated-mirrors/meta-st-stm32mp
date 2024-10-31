@@ -10,6 +10,8 @@ ENABLE_IMAGE_LICENSE_SUMMARY = "0"
 
 # Remove WIC image generation for the partition image
 IMAGE_FSTYPES:remove = "${WKS_IMAGE_FSTYPES}"
+# Remove U-Boot env ubi image generation for the partition image
+IMAGE_FSTYPES:remove = "ubootenvmultiubi"
 
 # Append DISTRO to image name even if we're not using ST distro setting
 # Mandatory to ease flashlayout file configuration
@@ -65,3 +67,11 @@ reformat_rootfs() {
         bbnote "${IMAGE_PARTITION_MOUNTPOINT} folder not available in rootfs folder, no reformat done..."
     fi
 }
+
+# Define specific EXT4 command line:
+#   - Create minimal inode number (as it is done by default in image_types.bbclass)
+#   - Add label name (maximum length of the volume label is 16 bytes)
+#     So use IMAGE_NAME_SUFFIX name by removing the '.' and truncing to 16 caracters
+#   - Deactivate metadata_csum and dir_index (hashed b-trees): update not supported
+#     by U-Boot
+EXTRA_IMAGECMD:ext4 = "-i 4096 -L ${@d.getVar('IMAGE_NAME_SUFFIX').replace('.', '', 1)[:16]} -O ^metadata_csum,^dir_index"
