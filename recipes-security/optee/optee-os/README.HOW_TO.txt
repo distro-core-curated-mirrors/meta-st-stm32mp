@@ -19,15 +19,22 @@ If you have never configured you git configuration:
 ---------------------------------------
 2. Initialize cross-compilation via SDK
 ---------------------------------------
- Source SDK environment:
-    $ source <path to SDK>/environment-setup-cortexa7t2hf-neon-vfpv4-ostl-linux-gnueabi
+Source SDK environment:
+    $ source <path to SDK>/environment-setup
 
- To verify if your cross-compilation environment have put in place:
-    $ set | grep CROSS
-    CROSS_COMPILE=arm-ostl-linux-gnueabi-
+* To verify that your cross-compilation environment is set-up correctly:
+    $ set | grep CROSS_COMPILE
+
+  If the variable CROSS_COMPILE has a value:
+   - arm-ostl-linux-gnueabi- for 32 bits architecture (for example STM32MP1)
+   - aarch64-ostl-linux- for 64 bits architecture (for example STM32MP2)
+  Then everything is set-up correctly
 
 Warning: the environment are valid only on the shell session where you have
  sourced the sdk environment.
+
+External device tree is extracted. If this is not the case, please follow the
+README_HOW_TO.txt in ../external-dt.
 
 --------------------------
 3. Prepare optee-os source
@@ -105,6 +112,9 @@ MANDATORY: You must update sources
 Since OpenSTLinux activates FIP by default, FIP_artifacts directory path must be specified before launching compilation
   - In case of using SOURCES-xxxx.tar.gz of Developer package the FIP_DEPLOYDIR_ROOT must be set as below:
     $> export FIP_DEPLOYDIR_ROOT=$PWD/../../FIP_artifacts
+To use the external device tree feature, EXTDT_DIR variable must be set to the root location of external DT
+as specified in the README.HOW_TO.txt of external-dt
+    $> export EXTDT_DIR=<external DT location>
 
 The build results for this component are available in DEPLOYDIR (Default: $PWD/../deploy).
 If needed, this deploy directory can be specified by adding "DEPLOYDIR=<your_deploy_dir_path>" compilation option to the build command line below.
@@ -117,6 +127,7 @@ To compile optee-os source code:
 To compile optee-os source code for a specific config:
     $ make -f $PWD/../Makefile.sdk CFG_EMBED_DTB_SOURCE_FILE=stm32mp157c-ev1 all
 To compile optee-os source code and overwrite the default FIP artifacts with built artifacts:
+    $> rm -rf $FIP_DEPLOYDIR_ROOT/optee/*
     $> make -f $PWD/../Makefile.sdk DEPLOYDIR=$FIP_DEPLOYDIR_ROOT/optee all
 
 ---------------------------
@@ -125,16 +136,16 @@ To compile optee-os source code and overwrite the default FIP artifacts with bui
 Please use STM32CubeProgrammer and only tick the ssbl-boot and fip partitions (more informations on the wiki website http://wiki.st.com/stm32mpu)
 
 ---------------------------
-7. Update Starter Package with optee-os compilation outputs
+7. Generate new Starter Package with optee-os compilation outputs
 ---------------------------
 If not already done, extract the artifacts from Starter Package tarball, for example:
-    # tar xf en.FLASH-stm32mp1-*.tar.xz
+    # tar xf en.FLASH-stm32mp*-*.tar.xz
 
 Move to Starter Package root folder,
     #> cd <your_starter_package_dir_path>
 Cleanup Starter Package from original optee-os artifacts first
-    #> rm -rf images/stm32mp1/fip/*
+    #> rm -rf images/stm32mp*/fip/*
 Update Starter Package with new fip artifacts from <FIP_DEPLOYDIR_ROOT>/fip folder:
-    #> cp -rvf $FIP_DEPLOYDIR_ROOT/fip/* images/stm32mp1/fip/
+    #> cp -rvf $FIP_DEPLOYDIR_ROOT/fip/* images/stm32mp*/fip/
 
 Then the new Starter Package is ready to use for "Image flashing" on board (more information on wiki website https://wiki.st.com/stm32mpu).
