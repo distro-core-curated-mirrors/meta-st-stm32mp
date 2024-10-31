@@ -3,6 +3,8 @@ FILESEXTRAPATHS:prepend := "${THISDIR}/tf-a-tools:"
 SRC_URI:append = " \
     file://0001-FIX-GCC-tools-overwrite.patch \
     file://0001-tools-allow-to-use-a-root-key-password-from-command-.patch \
+    \
+    file://create_st_fip_binary.sh \
     "
 
 DEPENDS += "dtc-native openssl"
@@ -21,7 +23,7 @@ do_configure[noexec] = "1"
 do_compile:prepend:class-native () {
     # This is still needed to have the native fiptool executing properly by
     # setting the RPATH
-    sed -e '/^LDLIBS/ s,$, \$\{BUILD_LDFLAGS},' \
+    sed -e '/^LDOPTS/ s,$, \$\{BUILD_LDFLAGS},' \
         -e '/^INCLUDE_PATHS/ s,$, \$\{BUILD_CFLAGS},' \
         -i ${S}/tools/fiptool/Makefile
     # This is still needed to have the native cert_create executing properly by
@@ -43,6 +45,8 @@ do_install() {
         ${B}/tools/cert_create/cert_create \
         ${B}/tools/encrypt_fw/encrypt_fw \
         ${D}${bindir}
+
+    install -m 0755 ${WORKDIR}/create_st_fip_binary.sh ${D}${bindir}
 }
 
 BBCLASSEXTEND += "native nativesdk"
