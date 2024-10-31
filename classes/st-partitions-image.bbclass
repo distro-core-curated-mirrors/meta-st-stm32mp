@@ -93,6 +93,11 @@ python __anonymous () {
 
                     break
 
+    images_multiubi_depends = d.getVar('STM32MP_UBI_VOLUME_IMAGE_DEPENDS') or ""
+    if len(images_multiubi_depends) > 0:
+        for img_dep in images_multiubi_depends.split():
+            image_partitions.append(img_dep)
+
     # Reset IMAGE_LIST_SUMMARY with computed partition configuration
     if d.getVar('ENABLE_IMAGE_LICENSE_SUMMARY') == "1":
         bb.debug(1, "Set IMAGE_SUMMARY_LIST with configuration: %s." % image_summary_list)
@@ -280,7 +285,7 @@ python extract_buildinfo() {
         rootfs_path = d.getVar('IMAGE_ROOTFS')
         buildinfo_srcfile = os.path.normpath(rootfs_path + '/' + buildinfo_origin)
         if os.path.isfile(buildinfo_srcfile):
-            buildinfo_deploy = os.path.basename(d.getVar('IMAGE_BUILDINFO_FILE')) + '-' + d.getVar('IMAGE_LINK_NAME')
+            buildinfo_deploy = os.path.basename(d.getVar('IMAGE_BUILDINFO_FILE')) + '-' + d.getVar('IMAGE_LINK_NAME').replace(d.getVar('IMAGE_NAME_SUFFIX'), '')
             buildinfo_dstfile = os.path.join(d.getVar('IMGDEPLOYDIR'), buildinfo_deploy)
             shutil.copy2(buildinfo_srcfile, buildinfo_dstfile)
         else:
