@@ -104,6 +104,11 @@ python __anonymous() {
             # Init SIGN_KEY_PATH_LIST from SIGN_KEY settings
             init_keylist_from('SIGN_KEY_PATH_LIST', 'SIGN_KEY', 'STM32MP_SOC_NAME', d)
 
+            # If signature are activated, for winning space, the debug parameter will be remove and level of trace decrease
+            if (d.getVar('ST_TF_A_DEBUG_TRACE') or "0") == '1':
+                bb.warn("TF-A SIGNATURE: force ST_TF_A_DEBUG_TRACE to '0' to disable DEBUG and decrease log level")
+                d.setVar('ST_TF_A_DEBUG_TRACE', "0")
+
         if d.getVar('ENCRYPT_ENABLE') == "1":
             if d.getVar('SIGN_ENABLE') == "0":
                 bb.fatal("[sign-stm32mp] You need to set 'SIGN_ENABLE = 1' to encrypt and sign binaries at once.")
@@ -121,5 +126,4 @@ python __anonymous() {
                 raise bb.parse.SkipRecipe("[sign-stm32mp] You cannot use ENCRYPT_FIP_KEY_PATH_LIST as it is internal to sign-stm32mp.bbclass.")
             # Init ENCRYPT_KEY_PATH_LIST from ENCRYPT_KEY settings
             init_keylist_from('ENCRYPT_FIP_KEY_PATH_LIST', 'ENCRYPT_FIP_KEY', 'STM32MP_ENCRYPT_SOC_NAME', d)
-
 }
