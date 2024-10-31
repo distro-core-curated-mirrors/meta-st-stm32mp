@@ -3,15 +3,21 @@ COMPATIBLE_MACHINE = "(stm32mpcommon)"
 #for EFI
 include ${@bb.utils.contains('MACHINE_FEATURES', 'efi', 'conf/image-uefi.conf', '', d)}
 inherit kernel
+inherit external-dt
+inherit multilib_header
+
+# For FIT image to expand properly for UBOOT_CONFIG vars
+include ${@bb.utils.contains('MACHINE_FEATURES', 'fit', 'recipes-bsp/u-boot/u-boot-stm32mp-config.inc', '', d)}
 
 DEPENDS += "openssl-native util-linux-native libyaml-native"
+DEPENDS += "unifdef-native bison-native rsync-native"
 
 B = "${WORKDIR}/build"
 # Configure build dir for externalsrc class usage through devtool
 EXTERNALSRC_BUILD:pn-${PN} = "${WORKDIR}/build"
 
 # To share config fragments between layers
-FILESEXTRAPATHS:prepend := "${THISDIR}:"
+FILESEXTRAPATHS:prepend := "${THISDIR}:${THISDIR}/linux-stm32mp:"
 
 do_deploy[sstate-outputdirs] = "${DEPLOY_DIR_IMAGE}/kernel"
 
@@ -19,9 +25,28 @@ do_deploy[sstate-outputdirs] = "${DEPLOY_DIR_IMAGE}/kernel"
 # Module kernel signature
 KERNEL_SIGN_ENABLE ?= "0"
 EXTRA_OEMAKE += "${@oe.utils.ifelse(d.getVar('KERNEL_SIGN_ENABLE') == '1', 'INSTALL_MOD_STRIP=1','')}"
+EXTRA_OEMAKE += "${@bb.utils.contains('EXTERNAL_DT_ENABLED', '1', 'KBUILD_EXTDTS=${STAGING_EXTDT_DIR}/${EXTDT_DIR_LINUX}', '', d)}"
 
 # Deploy kernel config file to deploy folder
 KERNEL_CONFIG_DEPLOY ??= "0"
+
+# scmversion
+# in case of several build with the same source code ( git, devtools),
+# a scmversion file is create on source code but never added
+# on build directory except for first build.
+# => Need to create the file in all case
+do_configure:prepend() {
+    if [ ! -d ${B} ]; then
+        mkdir -p ${B}
+    fi
+    if [ ! -e ${B}/.scmversion ]; then
+        echo ${KERNEL_LOCALVERSION} > ${B}/.scmversion
+    fi
+    if [ ! -e ${S}/.scmversion ]; then
+        echo ${KERNEL_LOCALVERSION} > ${B}/.scmversion
+        echo ${KERNEL_LOCALVERSION} > ${S}/.scmversion
+    fi
+}
 
 # ---------------------------------------------------------------------
 # Defconfig
@@ -70,11 +95,37 @@ do_configure:append() {
 }
 
 # ---------------------------------------------------------------------
+# stub for devicetree which are located on st directory
+do_install:prepend() {
+    if [ -d "${B}/arch/${ARCH}/boot/dts/st" ]; then
+        for dtbf in ${KERNEL_DEVICETREE}; do
+            if [ -n "${KERNEL_SUB_PATH}" -a -e "${B}/arch/${ARCH}/boot/dts/${KERNEL_SUB_PATH}${dtbf}" ]; then
+                install -m 0644 "${B}/arch/${ARCH}/boot/dts/${KERNEL_SUB_PATH}${dtbf}" "${B}/arch/${ARCH}/boot/dts/"
+            else
+                if [ -z "${KERNEL_SUB_PATH}" -a -e "${B}/arch/${ARCH}/boot/dts/st/${dtbf}" ]; then
+                    install -m 0644 "${B}/arch/${ARCH}/boot/dts/st/${dtbf}" "${B}/arch/${ARCH}/boot/dts/"
+                fi
+            fi
+        done
+    fi
+}
+correct_buildpaths() {
+    FILES=" \
+    ${B}/drivers/video/logo/logo_linux_clut224.c \
+    ${B}/drivers/tty/vt/consolemap_deftbl.c \
+    ${B}/lib/oid_registry_data.c \
+    "
+    for f in $FILES; do
+        if [ -e $f ]; then
+            sed -i "s|${TMPDIR}||g" $f
+        fi
+    done
+}
 do_install:append() {
     # Install KERNEL_IMAGETYPE for kernel-imagebootfs package
     install -m 0644 ${KERNEL_OUTPUT_DIR}/${KERNEL_IMAGETYPE} ${D}/${KERNEL_IMAGEDEST}
-    install -d ${D}/${sysconfdir}/modprobe.d/
 
+    install -d ${D}/${sysconfdir}/modprobe.d
     if ${@bb.utils.contains('MACHINE_FEATURES','gpu','true','false',d)}; then
         # when ACCEPT_EULA are filled
         echo "blacklist etnaviv" > ${D}/${sysconfdir}/modprobe.d/blacklist.conf
@@ -90,6 +141,16 @@ do_install:append() {
         install -d ${D}${EFI_PREFIX}/dtb
         install -m 0664 ${D}${EFI_PREFIX}/*.dtb ${D}${EFI_PREFIX}/dtb/
     fi
+
+    # install header for sdk
+    oe_runmake headers_install INSTALL_HDR_PATH=${D}${prefix}/src/linux-header-${LINUX_VERSION}
+    # Kernel should not be exporting this header
+    rm -f ${D}${prefix}/src/linux-header-${LINUX_VERSION}/include/scsi/scsi.h
+    # The ..install.cmd conflicts between various configure runs
+    find ${D}${prefix}/src/linux-header-${LINUX_VERSION} -name ..install.cmd | xargs rm -f
+
+    # correct buildpaths qa
+    correct_buildpaths
 }
 # ---------------------------------------------------------------------
 do_deploy:append() {
@@ -103,6 +164,7 @@ do_deploy:append() {
     fi
 }
 do_deploy[depends] += " virtual/kernel:do_package "
+
 
 # ---------------------------------------------------------------------
 # Support checking the kernel load address parameter: expecting proper value for ST kernel.
