@@ -5,7 +5,9 @@ require conf/machine/include/st-machine-features-stm32mp.inc
 require conf/machine/include/st-machine-flashlayout-stm32mp.inc
 require conf/machine/include/st-machine-flashlayout-deleteall-stm32mp.inc
 require conf/machine/include/st-machine-flashlayout-extensible-stm32mp.inc
+require conf/machine/include/st-machine-image-partition-stm32mp.inc
 require conf/machine/include/st-machine-storage-device-stm32mp.inc
+require conf/machine/include/st-machine-sdk-stm32mp.inc
 
 # Define specific common layer name
 MACHINEOVERRIDES =. "stm32mpcommon:"
@@ -19,24 +21,33 @@ MACHINEOVERRIDES =. "stcommon:"
 STM32MP_SOC_NAME = ""
 STM32MP_SOC_NAME:append:stm32mp15common = " stm32mp15 "
 STM32MP_SOC_NAME:append:stm32mp13common = " stm32mp13 "
+STM32MP_SOC_NAME:append:stm32mp21common = " stm32mp21 "
+STM32MP_SOC_NAME:append:stm32mp23common = " stm32mp23 "
+STM32MP_SOC_NAME:append:stm32mp25common = " stm32mp25 "
 # Take care of nativesdk override use case
 STM32MP_SOC_NAME:append:class-nativesdk = " stm32mp15 "
 STM32MP_SOC_NAME:append:class-nativesdk = " stm32mp13 "
+STM32MP_SOC_NAME:append:class-nativesdk = " stm32mp21 "
+STM32MP_SOC_NAME:append:class-nativesdk = " stm32mp23 "
+STM32MP_SOC_NAME:append:class-nativesdk = " stm32mp25 "
 
 STM32MP_ENCRYPT_SOC_NAME = ""
 STM32MP_ENCRYPT_SOC_NAME:append:stm32mp13common = " stm32mp13 "
+STM32MP_ENCRYPT_SOC_NAME:append:stm32mp21common = " stm32mp21 "
+STM32MP_ENCRYPT_SOC_NAME:append:stm32mp23common = " stm32mp23 "
+STM32MP_ENCRYPT_SOC_NAME:append:stm32mp25common = " stm32mp25 "
 
 # =========================================================================
 # boot scheme
 # =========================================================================
 # List of supported boot schemes
-BOOTSCHEME_LABELS ??= "optee"
+BOOTSCHEME_LABELS ??= "optee opteemin fastboot fastboot-opteemin"
 
 # =========================================================================
 # boot device
 # =========================================================================
 # List of supported boot devices
-BOOTDEVICE_LABELS ??= "emmc nand-4-256 nor-sdcard sdcard"
+BOOTDEVICE_LABELS ??= "emmc nand-4-256-1024 nor-sdcard sdcard nand-4-256-1024-sdcard"
 
 # =========================================================================
 # Machine settings
@@ -53,7 +64,7 @@ MACHINE_FEATURES:append = " initrd "
 DISTRO_EXTRA_RRECOMMENDS:remove = " ${@bb.utils.contains('COMBINED_FEATURES', 'initrd', '${INITRD_PACKAGE}', '', d)} "
 
 # Configure autoresize for any of the 'ext4' storage devices (through InitRD image)
-MACHINE_FEATURES:append = " ${@bb.utils.contains_any('BOOTDEVICE_LABELS',  ['emmc', 'sdcard'], 'autoresize', '', d)} "
+MACHINE_FEATURES:append = " ${@bb.utils.contains_any('BOOTDEVICE_LABELS',  ['emmc', 'nor-sdcard', 'nand-4-256-1024-sdcard', 'sdcard'], 'autoresize', '', d)} "
 
 # Use FIP image for boot loaders
 MACHINE_FEATURES:append = " fip"
@@ -72,12 +83,26 @@ RDEPENDS:${KERNEL_PACKAGE_NAME}-base = ""
 # Ship all kernel modules by default
 MACHINE_EXTRA_RRECOMMENDS = " kernel-modules ${@bb.utils.contains('MACHINE_FEATURES', 'efi', 'kernel-imageefi', 'kernel-imagebootfs', d)}"
 
+# Default external-dt init
+EXTERNAL_DT_ENABLED ?= "0"
+EXTERNAL_DEVICETREE_EMMC    ??= ""
+EXTERNAL_DEVICETREE_NAND    ??= ""
+EXTERNAL_DEVICETREE_NOR     ??= ""
+EXTERNAL_DEVICETREE_SDCARD  ??= ""
+EXTERNAL_DEVICETREE_SPINAND ??= ""
+
 # Default device tree list per supported storages
 STM32MP_DT_FILES_EMMC    ??= ""
 STM32MP_DT_FILES_NAND    ??= ""
 STM32MP_DT_FILES_NOR     ??= ""
 STM32MP_DT_FILES_SDCARD  ??= ""
 STM32MP_DT_FILES_SPINAND ??= ""
+
+STM32MP_DT_FILES_EMMC:append    = " ${@bb.utils.contains('EXTERNAL_DT_ENABLED', '1', '${EXTERNAL_DEVICETREE_EMMC}', '', d)}"
+STM32MP_DT_FILES_NAND:append    = " ${@bb.utils.contains('EXTERNAL_DT_ENABLED', '1', '${EXTERNAL_DEVICETREE_NAND}', '', d)}"
+STM32MP_DT_FILES_NOR:append     = " ${@bb.utils.contains('EXTERNAL_DT_ENABLED', '1', '${EXTERNAL_DEVICETREE_NOR}', '', d)}"
+STM32MP_DT_FILES_SDCARD:append  = " ${@bb.utils.contains('EXTERNAL_DT_ENABLED', '1', '${EXTERNAL_DEVICETREE_SDCARD}', '', d)}"
+STM32MP_DT_FILES_SPINAND:append = " ${@bb.utils.contains('EXTERNAL_DT_ENABLED', '1', '${EXTERNAL_DEVICETREE_SPINAND}', '', d)}"
 
 STM32MP_DT_FILES_ALL += "${STM32MP_DT_FILES_EMMC}"
 STM32MP_DT_FILES_ALL += "${STM32MP_DT_FILES_NAND}"
@@ -88,6 +113,21 @@ STM32MP_DT_FILES_ALL += "${STM32MP_DT_FILES_SPINAND}"
 # Set default supported device tree list (without duplicate)
 STM32MP_DEVICETREE:append = " ${@' '.join('%s' % dt_file for dt_file in list(dict.fromkeys((d.getVar('STM32MP_DT_FILES_ALL') or '').split())))} "
 
+# Default for programmer:
+STM32MP_DEVICETREE_PROGRAMMER_ENABLE ??= "1"
+# Programmer external-dt init
+EXTERNAL_DEVICETREE_PROGRAMMER ??= ""
+# Programmer device tree list for all supported storage
+STM32MP_DT_FILES_PROGRAMMER ??= "${STM32MP_DT_FILES_ALL}"
+STM32MP_DT_FILES_PROGRAMMER:append = " ${@bb.utils.contains('EXTERNAL_DT_ENABLED', '1', '${EXTERNAL_DEVICETREE_PROGRAMMER}', '', d)}"
+STM32MP_DEVICETREE_PROGRAMMER:append = " ${@' '.join('%s' % dt_file for dt_file in list(dict.fromkeys((d.getVar('STM32MP_DT_FILES_PROGRAMMER') or '').split())))} "
+# Programmer device tree file suffix (for flashlayout file creation)
+STM32MP_DEVICETREE_PROGRAMMER_SUFFIX ??= ""
+# Programmer specific binary namming (for flashlayout file creation)
+STM32MP_PROGRAMMER_SCHEME ??= "${@bb.utils.contains('STM32MP_DEVICETREE_PROGRAMMER_ENABLE', '1', 'programmer', '<DEVICE>', d)}"
+# Set the serial devie to use to program storage: uart or usb
+STMP32MP_PROGRAMMER_SERIAL ??= "usb"
+
 # =========================================================================
 # Machine specific packages
 # =========================================================================
@@ -95,105 +135,10 @@ STM32MP_DEVICETREE:append = " ${@' '.join('%s' % dt_file for dt_file in list(dic
 MACHINE_EXTRA_RRECOMMENDS:append = " ${@bb.utils.contains('DISTRO_FEATURES','sysvinit',' watchdog ','',d)} "
 
 # =========================================================================
-# Bootloader raw partition configuration : data, label, size (Kbytes)
+# Flashlayout configuration
 # =========================================================================
-# -----------------------------------------------------------------------------
-# NOTE: There are few restrictions to follow:
-#       -   The partition for the first boot loader should follow the naming
-#           rule: fsbl*
-#       -   The partition for the secondary boot loader should follow the naming
-#           rule: fip
-# -----------------------------------------------------------------------------
-ENABLE_FLASHLAYOUT_CONFIG_FWUP ?= "${@bb.utils.contains('MACHINE_FEATURES', 'fw-update', '1', '0', d)}"
-
-STM32MP_FSBL_PROGAMMER_NAME ?= "fsbl-boot"
-STM32MP_SSBL_PROGAMMER_NAME ?= "fip-boot"
-
-STM32MP_FSBL1_DATA ?= "arm-trusted-firmware/tf-a-<TYPE>-<DEVICE>${TF_A_ENCRYPT_SUFFIX}${TF_A_SIGN_SUFFIX}.stm32"
-STM32MP_FSBL1_NAME ?= "${@bb.utils.contains('ENABLE_FLASHLAYOUT_CONFIG_FWUP', '1', 'fsbl', 'fsbl1', d)}"
-STM32MP_FSBL1_SIZE ?= "256"
-STM32MP_FSBL2_DATA ?= "${STM32MP_FSBL1_DATA}"
-STM32MP_FSBL2_NAME ?= "fsbl2"
-STM32MP_FSBL2_SIZE ?= "${STM32MP_FSBL1_SIZE}"
-STM32MP_SSBL1_DATA ?= "fip/fip-<TYPE>-<BOOTSCHEME>${FIP_ENCRYPT_SUFFIX}${FIP_SIGN_SUFFIX}.bin"
-STM32MP_SSBL1_NAME ?= "${@bb.utils.contains('ENABLE_FLASHLAYOUT_CONFIG_FWUP', '1', 'fip-a', 'fip', d)}"
-STM32MP_SSBL1_SIZE ?= "4096"
-STM32MP_SSBL2_DATA ?= "${@bb.utils.contains('ENABLE_FLASHLAYOUT_CONFIG_FWUP', '1', '', '${STM32MP_SSBL1_DATA}', d)}"
-STM32MP_SSBL2_NAME ?= "${@bb.utils.contains('ENABLE_FLASHLAYOUT_CONFIG_FWUP', '1', 'fip-b', 'fip2', d)}"
-STM32MP_SSBL2_SIZE ?= "${STM32MP_SSBL1_SIZE}"
-STM32MP_UENV_DATA ?= ""
-STM32MP_UENV_NAME ?= "u-boot-env"
-STM32MP_UENV_SIZE ?= "512"
-STM32MP_METADATA_DATA ?= "${@bb.utils.contains('MACHINE_FEATURES', 'fw-update', 'arm-trusted-firmware/${TF_A_METADATA_BINARY}', '', d)}"
-STM32MP_METADATA_NAME ?= "${@bb.utils.contains('ENABLE_FLASHLAYOUT_CONFIG_FWUP', '1', 'metadata', '', d)}"
-STM32MP_METADATA_SIZE ?= "256"
-
-# Specific override for NAND device type regarding partition sizes to follow
-# the hard coded configuration on U-Boot source code
-STM32MP_FSBL1_SIZE_UBOOT ?= "${@bb.utils.contains('ENABLE_FLASHLAYOUT_CONFIG_FWUP', '1', '512', '1024', d)}"
-STM32MP_METADATA_SIZE_UBOOT ?= "512"
-
-# Bootloader Partitions configuration
-PARTITIONS_BOOTLOADER_CONFIG += "${@bb.utils.contains('BOOTDEVICE_LABELS', 'emmc', 'emmc', '', d)}"
-PARTITIONS_BOOTLOADER_CONFIG += "${@bb.utils.contains('BOOTDEVICE_LABELS', 'nand-4-256', 'nand-4-256', '', d)}"
-PARTITIONS_BOOTLOADER_CONFIG += "${@bb.utils.contains('BOOTDEVICE_LABELS', 'nor-sdcard', 'nor-sdcard', '', d)}"
-PARTITIONS_BOOTLOADER_CONFIG += "${@bb.utils.contains('BOOTDEVICE_LABELS', 'nor', 'nor', '', d)}"
-PARTITIONS_BOOTLOADER_CONFIG += "${@bb.utils.contains('BOOTDEVICE_LABELS', 'sdcard', bb.utils.contains('MACHINE_FEATURES', 'efi', 'sdcard sdcard-EFI', 'sdcard', d), '', d)}"
-PARTITIONS_BOOTLOADER_CONFIG += "${@bb.utils.contains('BOOTDEVICE_LABELS', 'spinand-2-128', 'spinand-2-128', '', d)}"
-
-# <binary_name>,<partlabel>,<size>,<type>,<copy>
-PARTITIONS_BOOTLOADER_CONFIG[emmc] ?= "\
-    ${@ '${STM32MP_FSBL1_DATA},${STM32MP_FSBL1_NAME},${STM32MP_FSBL1_SIZE},Binary,' + bb.utils.contains('ENABLE_FLASHLAYOUT_CONFIG_FWUP', '1', '2', '1', d) if '${STM32MP_FSBL1_NAME}' else ''} \
-    ${@ '${STM32MP_FSBL2_DATA},${STM32MP_FSBL2_NAME},${STM32MP_FSBL2_SIZE},Binary,1' if '${STM32MP_FSBL2_NAME}' and bb.utils.contains('ENABLE_FLASHLAYOUT_CONFIG_FWUP', '1', False, True, d) else ''} \
-    ${@ '${STM32MP_METADATA_DATA},${STM32MP_METADATA_NAME},${STM32MP_METADATA_SIZE},FWU_MDATA,2' if '${STM32MP_METADATA_NAME}' else ''} \
-    ${@ '${STM32MP_SSBL1_DATA},${STM32MP_SSBL1_NAME},${STM32MP_SSBL1_SIZE},FIP,1' if '${STM32MP_SSBL1_NAME}' else ''} \
-    ${@ '${STM32MP_SSBL2_DATA},${STM32MP_SSBL2_NAME},${STM32MP_SSBL2_SIZE},FIP,1' if '${STM32MP_SSBL2_NAME}' and bb.utils.contains('ENABLE_FLASHLAYOUT_CONFIG_FWUP', '1', True, False, d) else ''} \
-    ${@ '${STM32MP_UENV_DATA},${STM32MP_UENV_NAME},${STM32MP_UENV_SIZE},ENV,1' if '${STM32MP_UENV_NAME}' else ''} \
-    "
-PARTITIONS_BOOTLOADER_CONFIG[nand-4-256] ?= "\
-    ${@ '${STM32MP_FSBL1_DATA},${STM32MP_FSBL1_NAME},${STM32MP_FSBL1_SIZE_UBOOT},Binary,2' if '${STM32MP_FSBL1_NAME}' else ''} \
-    ${@ '${STM32MP_METADATA_DATA},${STM32MP_METADATA_NAME},${STM32MP_METADATA_SIZE_UBOOT},FWU_MDATA,2' if '${STM32MP_METADATA_NAME}' else ''} \
-    ${@ '${STM32MP_SSBL1_DATA},${STM32MP_SSBL1_NAME},${STM32MP_SSBL1_SIZE},FIP,' + bb.utils.contains('ENABLE_FLASHLAYOUT_CONFIG_FWUP', '1', '2', '1', d) if '${STM32MP_SSBL1_NAME}' else ''} \
-    ${@ '${STM32MP_SSBL2_DATA},${STM32MP_SSBL2_NAME},${STM32MP_SSBL1_SIZE},FIP,' + bb.utils.contains('ENABLE_FLASHLAYOUT_CONFIG_FWUP', '1', '2', '1', d) if '${STM32MP_SSBL2_NAME}' else ''} \
-    "
-PARTITIONS_BOOTLOADER_CONFIG[nor] ?= "\
-    ${@ '${STM32MP_FSBL1_DATA},${STM32MP_FSBL1_NAME},${STM32MP_FSBL1_SIZE},Binary,' + bb.utils.contains('ENABLE_FLASHLAYOUT_CONFIG_FWUP', '1', '2', '1', d) if '${STM32MP_FSBL1_NAME}' else ''} \
-    ${@ '${STM32MP_FSBL2_DATA},${STM32MP_FSBL2_NAME},${STM32MP_FSBL2_SIZE},Binary,1' if '${STM32MP_FSBL2_NAME}' and bb.utils.contains('ENABLE_FLASHLAYOUT_CONFIG_FWUP', '1', False, True, d) else ''} \
-    ${@ '${STM32MP_METADATA_DATA},${STM32MP_METADATA_NAME},${STM32MP_METADATA_SIZE},FWU_MDATA,2' if '${STM32MP_METADATA_NAME}' else ''} \
-    ${@ '${STM32MP_SSBL1_DATA},${STM32MP_SSBL1_NAME},${STM32MP_SSBL1_SIZE},FIP,1' if '${STM32MP_SSBL1_NAME}' else ''} \
-    ${@ '${STM32MP_SSBL2_DATA},${STM32MP_SSBL2_NAME},${STM32MP_SSBL2_SIZE},FIP,1' if '${STM32MP_SSBL2_NAME}' and bb.utils.contains('ENABLE_FLASHLAYOUT_CONFIG_FWUP', '1', True, False, d) else ''} \
-    ${@ '${STM32MP_UENV_DATA},${STM32MP_UENV_NAME},${STM32MP_UENV_SIZE},ENV,1' if '${STM32MP_UENV_NAME}' else ''} \
-    "
-PARTITIONS_BOOTLOADER_CONFIG[nor-sdcard] ?= "\
-    ${@ '${STM32MP_FSBL1_DATA},${STM32MP_FSBL1_NAME},${STM32MP_FSBL1_SIZE},Binary,' + bb.utils.contains('ENABLE_FLASHLAYOUT_CONFIG_FWUP', '1', '2', '1', d) if '${STM32MP_FSBL1_NAME}' else ''} \
-    ${@ '${STM32MP_FSBL2_DATA},${STM32MP_FSBL2_NAME},${STM32MP_FSBL2_SIZE},Binary,1' if '${STM32MP_FSBL2_NAME}' and bb.utils.contains('ENABLE_FLASHLAYOUT_CONFIG_FWUP', '1', False, True, d) else ''} \
-    ${@ '${STM32MP_METADATA_DATA},${STM32MP_METADATA_NAME},${STM32MP_METADATA_SIZE},FWU_MDATA,2' if '${STM32MP_METADATA_NAME}' else ''} \
-    ${@ '${STM32MP_SSBL1_DATA},${STM32MP_SSBL1_NAME},${STM32MP_SSBL1_SIZE},FIP,1' if '${STM32MP_SSBL1_NAME}' else ''} \
-    ${@ '${STM32MP_SSBL2_DATA},${STM32MP_SSBL2_NAME},${STM32MP_SSBL2_SIZE},FIP,1' if '${STM32MP_SSBL2_NAME}' and bb.utils.contains('ENABLE_FLASHLAYOUT_CONFIG_FWUP', '1', True, False, d) else ''} \
-    ${@ '${STM32MP_UENV_DATA},${STM32MP_UENV_NAME},${STM32MP_UENV_SIZE},ENV,1' if '${STM32MP_UENV_NAME}' else ''} \
-    "
-PARTITIONS_BOOTLOADER_CONFIG[sdcard] ?= "\
-    ${@ '${STM32MP_FSBL1_DATA},${STM32MP_FSBL1_NAME},${STM32MP_FSBL1_SIZE},Binary,' + bb.utils.contains('ENABLE_FLASHLAYOUT_CONFIG_FWUP', '1', '2', '1', d) if '${STM32MP_FSBL1_NAME}' else ''} \
-    ${@ '${STM32MP_FSBL2_DATA},${STM32MP_FSBL2_NAME},${STM32MP_FSBL2_SIZE},Binary,1' if '${STM32MP_FSBL2_NAME}' and bb.utils.contains('ENABLE_FLASHLAYOUT_CONFIG_FWUP', '1', False, True, d) else ''} \
-    ${@ '${STM32MP_METADATA_DATA},${STM32MP_METADATA_NAME},${STM32MP_METADATA_SIZE},FWU_MDATA,2' if '${STM32MP_METADATA_NAME}' else ''} \
-    ${@ '${STM32MP_SSBL1_DATA},${STM32MP_SSBL1_NAME},${STM32MP_SSBL1_SIZE},FIP,1' if '${STM32MP_SSBL1_NAME}' else ''} \
-    ${@ '${STM32MP_SSBL2_DATA},${STM32MP_SSBL2_NAME},${STM32MP_SSBL2_SIZE},FIP,1' if '${STM32MP_SSBL2_NAME}' else ''} \
-    ${@ '${STM32MP_UENV_DATA},${STM32MP_UENV_NAME},${STM32MP_UENV_SIZE},ENV,1' if '${STM32MP_UENV_NAME}' else ''} \
-    "
-PARTITIONS_BOOTLOADER_CONFIG[sdcard-EFI] ?= "\
-    ${@ '${STM32MP_FSBL1_DATA},${STM32MP_FSBL1_NAME},${STM32MP_FSBL1_SIZE},Binary,' + bb.utils.contains('ENABLE_FLASHLAYOUT_CONFIG_FWUP', '1', '2', '1', d) if '${STM32MP_FSBL1_NAME}' else ''} \
-    ${@ '${STM32MP_FSBL2_DATA},${STM32MP_FSBL2_NAME},${STM32MP_FSBL2_SIZE},Binary,1' if '${STM32MP_FSBL2_NAME}' and bb.utils.contains('ENABLE_FLASHLAYOUT_CONFIG_FWUP', '1', False, True, d) else ''} \
-    ${@ '${STM32MP_METADATA_DATA},${STM32MP_METADATA_NAME},${STM32MP_METADATA_SIZE},FWU_MDATA,2' if '${STM32MP_METADATA_NAME}' else ''} \
-    ${@ '${STM32MP_SSBL1_DATA},${STM32MP_SSBL1_NAME},${STM32MP_SSBL1_SIZE},FIP,1' if '${STM32MP_SSBL1_NAME}' else ''} \
-    ${@ '${STM32MP_SSBL2_DATA},${STM32MP_SSBL2_NAME},${STM32MP_SSBL2_SIZE},FIP,1' if '${STM32MP_SSBL2_NAME}' else ''} \
-    ${@ '${STM32MP_UENV_DATA},${STM32MP_UENV_NAME},${STM32MP_UENV_SIZE},ENV,1' if '${STM32MP_UENV_NAME}' else ''} \
-    "
-PARTITIONS_BOOTLOADER_CONFIG[spinand-2-128] ?= "\
-    ${@ '${STM32MP_FSBL1_DATA},${STM32MP_FSBL1_NAME},${STM32MP_FSBL1_SIZE_UBOOT},Binary,2' if '${STM32MP_FSBL1_NAME}' else ''} \
-    ${@ '${STM32MP_METADATA_DATA},${STM32MP_METADATA_NAME},${STM32MP_METADATA_SIZE_UBOOT},FWU_MDATA,2' if '${STM32MP_METADATA_NAME}' else ''} \
-    ${@ '${STM32MP_SSBL1_DATA},${STM32MP_SSBL1_NAME},${STM32MP_SSBL1_SIZE},FIP,' + bb.utils.contains('ENABLE_FLASHLAYOUT_CONFIG_FWUP', '1', '2', '1', d) if '${STM32MP_SSBL1_NAME}' else ''} \
-    ${@ '${STM32MP_SSBL2_DATA},${STM32MP_SSBL2_NAME},${STM32MP_SSBL1_SIZE},FIP,' + bb.utils.contains('ENABLE_FLASHLAYOUT_CONFIG_FWUP', '1', '2', '1', d) if '${STM32MP_SSBL2_NAME}' else ''} \
-    "
+#ENABLE_FLASHLAYOUT_CONFIG_FWUP ?= "${@bb.utils.contains('MACHINE_FEATURES', 'fw-update', '1', '0', d)}"
+ENABLE_FLASHLAYOUT_CONFIG_FWUP ?= "1"
 
 # =========================================================================
 # Image
@@ -207,239 +152,52 @@ ENABLE_IMAGE_LICENSE_SUMMARY ?= "1"
 ENABLE_IMAGE_CVE_SUMMARY ?= "1"
 
 ST_MAIN_COMPONENTS:stm32mp1common = "tf-a-stm32mp, optee-os-stm32mp, u-boot-stm32mp, linux-stm32mp"
-
-# Define image partition size (supposed to be set as max size in image recipe)
-
-# Proposed value for rootfs should fit our highest constraint: NAND size (1GiB)
-#   With fw-update we have the following partitions:
-#       FSBL1 + FSBL2 + METADATA1+ METADATA2 + FIP-A1 + FIP-A2 + FIP-B1 + FIP-B2 + Multivolume UBI = NAND size
-#       Multivolume UBI = 1GiB - (512KiB + 512KiB + 512KiB + 512KiB + 4MiB + 4MiB + 4MiB + 4MiB) = 1006MiB
-#   Without fw-update we have following partitions
-#       FSBL1 + FIP + FIP2 + Multivolume UBI = NAND size
-#       Multivolume UBI = 1GiB - (2MiB + 4MiB + 4MiB) = 1014MiB
-# With multivolume UBI split:
-#   Multivolume UBI > uboot_config + uboot_config_r + bootfs + vendorfs + rootfs + userfs + UBI Overhead
-# From http://www.linux-mtd.infradead.org/doc/ubi.html#L_overhead, we compute
-# the UBI overhead for our NAND:
-#   With fw-update:
-#       (20*4096/1024 + 4) * 256KiB + (256KiB - 248KiB) * (1006MiB/256KiB - 20*4096/1024 - 4) = 53024KiB
-#   Without fw-update:
-#       (20*4096/1024 + 4) * 256KiB + (256KiB - 248KiB) * (1014MiB/256KiB - 20*4096/1024 - 4) = 53280KiB
-# In addition, for each UBIFS, our NAND consummed 9 extra eraseblocks
-# So:
-#   rootfs < Multivolume UBI - (uboot_config + uboot_config_r + bootfs + vendorfs + userfs + UBI Overhead + 4 * 9*eraseblocks)
-#   With fw-update:
-#       rootfs < 1006MiB - (256KiB + 256KiB + 64MiB + 16MiB + 128MiB + 53024KiB + 4 * 9 * 256KiB)
-#       rootfs < 736.7MiB
-#   Without fw-update:
-#       rootfs < 1014MiB - (256KiB + 256KiB + 64MiB + 16MiB + 128MiB + 53280KiB + 4 * 9 * 256KiB)
-#       rootfs < 744.5MiB
-# Proposed value for rootfs is:
-#   With fw-update   : 736MiB
-#   Without fw-update: 744MiB
-STM32MP_ROOTFS_MAXSIZE_NAND ?= "${@bb.utils.contains('ENABLE_FLASHLAYOUT_CONFIG_FWUP', '1', '753664', '762336', d)}"
-
-# Default ROOTFS max size for image being built to this value
-IMAGE_ROOTFS_MAXSIZE ?= "${STM32MP_ROOTFS_MAXSIZE_NAND}"
+ST_MAIN_COMPONENTS:stm32mp2common = "tf-a-stm32mp, tf-m-stm32mp, optee-os-stm32mp, u-boot-stm32mp, linux-stm32mp"
 
 # Partitions configuration
 IMAGE_CLASSES += "st-partitions-image"
 
-# Enable use of extra partition(s)
-ST_BOOTFS   ?= "1"
-ST_VENDORFS ?= "1"
-ST_USERFS   ?= "1"
-
-PARTITIONS_IMAGES += "${@bb.utils.contains('ST_BOOTFS', '1', bb.utils.contains('MACHINE_FEATURES', 'efi', 'bootfs efi', 'bootfs', d), '', d)}"
-PARTITIONS_IMAGES += "${@bb.utils.contains('ST_VENDORFS', '1', 'vendorfs', '', d)}"
-PARTITIONS_IMAGES += "rootfs"
-PARTITIONS_IMAGES += "${@bb.utils.contains('ST_USERFS', '1', 'userfs', '', d)}"
-
-# Configure the partition images list to use as default (for both ext4 and ubi)
-PARTITIONS_LIST += "${@bb.utils.contains('ST_BOOTFS', '1', 'bootfs', '', d)}"
-PARTITIONS_LIST += "${@bb.utils.contains('ST_VENDORFS', '1', 'vendorfs', '', d)}"
-PARTITIONS_LIST += "rootfs"
-PARTITIONS_LIST += "${@bb.utils.contains('ST_USERFS', '1', 'userfs', '', d)}"
-# Configure the partition images list to use for EFI boot
-PARTITIONS_LIST_EFI += "${@bb.utils.contains('ST_BOOTFS', '1', 'efi', '', d)}"
-PARTITIONS_LIST_EFI += "${@bb.utils.contains('ST_VENDORFS', '1', 'vendorfs', '', d)}"
-PARTITIONS_LIST_EFI += "rootfs"
-PARTITIONS_LIST_EFI += "${@bb.utils.contains('ST_USERFS', '1', 'userfs', '', d)}"
-
-# Define image to use for extra partitions
-STM32MP_BOOTFS_EFI_IMAGE ?= "st-image-bootfs-efi"
-STM32MP_BOOTFS_IMAGE      ?= "st-image-bootfs"
-STM32MP_BOOTFS_LABEL      ?= "bootfs"
-STM32MP_BOOTFS_MOUNTPOINT ?= "/boot"
-# Proposed value for bootfs is 64MB
-STM32MP_BOOTFS_SIZE       ?= "65536"
-STM32MP_ROOTFS_IMAGE ?= "${@[d.getVar('IMAGE_BASENAME'), d.getVar('IMAGE_BASENAME').replace('-%s' % d.getVar('DISTRO'), '')][d.getVar('TARGET_VENDOR') == (d.getVar('STM32MP_TARGETVENDOR') or "")]}"
-STM32MP_ROOTFS_LABEL ?= "rootfs"
-# Configure the rootfs size with IMAGE_ROOTFS_MAXSIZE variable
-STM32MP_ROOTFS_SIZE  ?= "${IMAGE_ROOTFS_MAXSIZE}"
-STM32MP_USERFS_IMAGE      ?= "st-image-userfs"
-STM32MP_USERFS_LABEL      ?= "userfs"
-STM32MP_USERFS_MOUNTPOINT ?= "/usr/local"
-# Proposed value for userfs is 128MB
-STM32MP_USERFS_SIZE       ?= "131072"
-STM32MP_VENDORFS_IMAGE      ?= "st-image-vendorfs"
-STM32MP_VENDORFS_LABEL      ?= "vendorfs"
-STM32MP_VENDORFS_MOUNTPOINT ?= "/vendor"
-# Proposed value for vendorfs is 16MB
-STM32MP_VENDORFS_SIZE       ?= "16384"
-
-# <image_name>,<partition_label>,<mountpoint>,<size>,<type>
-PARTITIONS_IMAGES[bootfs]   ?= "${STM32MP_BOOTFS_IMAGE},${STM32MP_BOOTFS_LABEL},${STM32MP_BOOTFS_MOUNTPOINT},${STM32MP_BOOTFS_SIZE},System"
-PARTITIONS_IMAGES[efi]      ?= "${STM32MP_BOOTFS_EFI_IMAGE},${STM32MP_BOOTFS_LABEL},${STM32MP_BOOTFS_MOUNTPOINT},${STM32MP_BOOTFS_SIZE},ESP"
-PARTITIONS_IMAGES[vendorfs] ?= "${STM32MP_VENDORFS_IMAGE},${STM32MP_VENDORFS_LABEL},${STM32MP_VENDORFS_MOUNTPOINT},${STM32MP_VENDORFS_SIZE},FileSystem"
-PARTITIONS_IMAGES[rootfs]   ?= "${STM32MP_ROOTFS_IMAGE},${STM32MP_ROOTFS_LABEL},,${STM32MP_ROOTFS_SIZE},FileSystem"
-PARTITIONS_IMAGES[userfs]   ?= "${STM32MP_USERFS_IMAGE},${STM32MP_USERFS_LABEL},${STM32MP_USERFS_MOUNTPOINT},${STM32MP_USERFS_SIZE},FileSystem"
-
-# =========================================================================
-# Image partition configuration : data, label, size (Kbytes)
-# =========================================================================
-STM32MP_UBIFS_DATA ?= "${IMAGE_LINK_NAME}_<CONFIG>_multivolume.ubi"
-STM32MP_UBIFS_NAME ?= "ubifs"
-STM32MP_UBIFS_SIZE ?= ""
-
-# Partitions configuration
-PARTITIONS_CONFIG += "${@bb.utils.contains('BOOTDEVICE_LABELS', 'emmc', 'emmc', '', d)}"
-PARTITIONS_CONFIG += "${@bb.utils.contains('BOOTDEVICE_LABELS', 'nand-4-256', 'nand-4-256', '', d)}"
-PARTITIONS_CONFIG += "${@bb.utils.contains('BOOTDEVICE_LABELS', 'nor', 'nor', '', d)}"
-PARTITIONS_CONFIG += "${@bb.utils.contains('BOOTDEVICE_LABELS', 'nor-sdcard', 'nor-sdcard', '', d)}"
-PARTITIONS_CONFIG += "${@bb.utils.contains('BOOTDEVICE_LABELS', 'sdcard', bb.utils.contains('MACHINE_FEATURES', 'efi', 'sdcard sdcard-EFI', 'sdcard', d), '', d)}"
-PARTITIONS_CONFIG += "${@bb.utils.contains('BOOTDEVICE_LABELS', 'spinand-2-128', 'spinand-2-128', '', d)}"
-
-PARTITIONS_SUFFIX ?= "ext4"
-
-def partImage2partConfig(config, fstype, d):
-    """
-    Convert PARTTIONS_IMAGES['config'] setting format to format expected to feed
-    PARTITIONS_CONFIG[xxx].
-    Manage <image_name> update respect to 'fstype' provided and apply the rootfs
-    namming or standard partition image one.
-        FROM: <image_name>,<partition_label>,<mountpoint>,<size>,<type>
-        TO  : <binary_name>,<partition_label>,<size>,<type>
-    """
-    items = d.getVarFlag('PARTITIONS_IMAGES', config).split(',') or ""
-    if len(items) != 5:
-        bb.fatal('Wrong settings for PARTTIONS_IMAGES[%s] : %s' % (config, items))
-    overrides = d.getVar('OVERRIDES')
-    if items[2] == '' and 'openstlinuxcommon' not in overrides.split(':'):
-        bin_suffix = '-${MACHINE}'
-    else:
-        bin_suffix = '-${DISTRO}-${MACHINE}'
-    bin_name = items[0] + bin_suffix + '.' + items[1] + '.'+ fstype
-    # Set string for PARTITIONS_CONFIG item: <binary_name>,<partlabel>,<size>,<type>
-    part_format = bin_name + ',' + items[1] + ',' + items[3] + ',' + items[4]
-    return part_format
-
-# <binary_name>,<partlabel>,<size>,<type>,<copy>
-PARTITIONS_CONFIG[emmc] ?= "\
-    ${@' '.join(['%s' % partImage2partConfig(config, '${PARTITIONS_SUFFIX}', d) for config in d.getVar('PARTITIONS_LIST').split()])} \
-    "
-PARTITIONS_CONFIG[nand-4-256] ?= "\
-    ${STM32MP_UBIFS_DATA},${STM32MP_UBIFS_NAME},${STM32MP_UBIFS_SIZE},System,1 \
-    "
-PARTITIONS_CONFIG[nor] ?= "\
-    ${@' '.join(['%s' % partImage2partConfig(config, '${PARTITIONS_SUFFIX}', d) for config in d.getVar('PARTITIONS_LIST').split()])} \
-    "
-PARTITIONS_CONFIG[nor-sdcard] ?= "\
-    ${@' '.join(['%s' % partImage2partConfig(config, '${PARTITIONS_SUFFIX}', d) for config in d.getVar('PARTITIONS_LIST').split()])} \
-    "
-PARTITIONS_CONFIG[sdcard] ?= "\
-    ${@' '.join(['%s' % partImage2partConfig(config, '${PARTITIONS_SUFFIX}', d) for config in d.getVar('PARTITIONS_LIST').split()])} \
-    "
-PARTITIONS_CONFIG[sdcard-EFI] ?= "\
-    ${@' '.join(['%s' % partImage2partConfig(config, 'vfat' if config == 'efi' else '${PARTITIONS_SUFFIX}', d) for config in d.getVar('PARTITIONS_LIST_EFI').split()])} \
-"
-PARTITIONS_CONFIG[spinand-2-128] ?= "\
-    ${STM32MP_UBIFS_DATA},${STM32MP_UBIFS_NAME},${STM32MP_UBIFS_SIZE},System,1 \
-"
-
 # UBI Configuration
 IMAGE_CLASSES += "image_types-stubi"
-
-# Define UBI volume label to use in kernel command line to mount UBI file system
-UBI_VOLNAME ?= "rootfs"
+IMAGE_CLASSES += "image_types-stnand-uboot-ubi"
 
 # Define UBI labels to build
 #   Naming rules for UBI partitions:
 #      nand_<PageSize>_<BlockSize>
 #      nor_<BlockSize>
 #   Like that a same UBI partition can be used for severals NAND/NOR providers
-MULTIUBI_BUILD += "${@bb.utils.contains('BOOTDEVICE_LABELS', 'nand-4-256', 'nand_4_256', '', d)}"
-MULTIUBI_BUILD += "${@bb.utils.contains('BOOTDEVICE_LABELS', 'spinand-2-128', 'spinand_2_128', '', d)}"
+MULTIUBI_BUILD += "${@bb.utils.contains_any('BOOTDEVICE_LABELS', 'nand-4-256-1024 nand-4-256-1024-sdcard', 'nand_4_256_1024', '', d)}"
+MULTIUBI_BUILD += "${@bb.utils.contains_any('BOOTDEVICE_LABELS', 'nand-2-128-256 nand-2-128-256-sdcard', 'nand_2_128_256', '', d)}"
+MULTIUBI_BUILD += "${@bb.utils.contains_any('BOOTDEVICE_LABELS', 'nand-4-256-512 nand-4-256-512-sdcard', 'nand_4_256_512', '', d)}"
 
-# UBI Args for NAND by default on MB1262 (Micron MT29F8G16ABACAH4)
+# UBI Args for NAND by default on MB1262 (Micron MT29F8G16ABACAH4) 1GB
 # LEB = BLOCK_SIZE - (2 * page size): 256*1024 - (2*4096)
-MKUBIFS_ARGS_nand_4_256 = "--min-io-size 4096 --leb-size 253952 --max-leb-cnt 4096"
-UBINIZE_ARGS_nand_4_256 = "--min-io-size 4096 --peb-size 256KiB"
+MKUBIFS_ARGS_nand_4_256_1024 = "--min-io-size 4096 --leb-size 253952 --max-leb-cnt 4096"
+UBINIZE_ARGS_nand_4_256_1024 = "--min-io-size 4096 --peb-size 256KiB"
 # Set extra size required for UBIFS volume size (KiB)
-EXTRA_UBIFS_SIZE_nand_4_256 = "2304"
-# UBI Args for SPI NAND by default on MB1262 (Micron MT29F2G01ABA)
+EXTRA_UBIFS_SIZE_nand_4_256_1024 = "2304"
+# UBI Args for SPI NAND by default on MB1262 (Micron MT29F2G01ABA) 256MB
 # LEB = BLOCK_SIZE - (2 * page size): 128*1024 - (2*2048)
-MKUBIFS_ARGS_spinand_2_128 = "--min-io-size 2048 --leb-size 126976 --max-leb-cnt 2048"
-UBINIZE_ARGS_spinand_2_128 = "--min-io-size 2048 --peb-size 128KiB"
+MKUBIFS_ARGS_nand_2_128_256 = "--min-io-size 2048 --leb-size 126976 --max-leb-cnt 2048"
+UBINIZE_ARGS_nand_2_128_256 = "--min-io-size 2048 --peb-size 128KiB"
 # Set extra size required for UBIFS volume size (KiB)
-EXTRA_UBIFS_SIZE_spinand_2_128 = "1408"
-
-# Define two empty volumes to manage U-Boot config beginning of multivolume UBIFS
-STM32MP_MULTIUBI_UENV1_NAME ?= "U-Boot-env-1"
-STM32MP_MULTIUBI_UENV1_LABEL = "uboot_config"
-STM32MP_MULTIUBI_UENV1_SIZE ?= "256"
-STM32MP_MULTIUBI_UENV2_NAME ?= "U-Boot-env-2"
-STM32MP_MULTIUBI_UENV2_LABEL = "uboot_config_r"
-STM32MP_MULTIUBI_UENV2_SIZE ?= "${STM32MP_MULTIUBI_UENV1_SIZE}"
-
-STM32MP_UBI_VOLUME_nand_4_256:prepend = "\
-    ${STM32MP_MULTIUBI_UENV1_NAME},${STM32MP_MULTIUBI_UENV1_LABEL},${STM32MP_MULTIUBI_UENV1_SIZE},empty \
-    ${STM32MP_MULTIUBI_UENV2_NAME},${STM32MP_MULTIUBI_UENV2_LABEL},${STM32MP_MULTIUBI_UENV2_SIZE},empty \
-    "
-STM32MP_UBI_VOLUME_spinand_2_128:prepend = "\
-    ${STM32MP_MULTIUBI_UENV1_NAME},${STM32MP_MULTIUBI_UENV1_LABEL},${STM32MP_MULTIUBI_UENV1_SIZE},empty \
-    ${STM32MP_MULTIUBI_UENV2_NAME},${STM32MP_MULTIUBI_UENV2_LABEL},${STM32MP_MULTIUBI_UENV2_SIZE},empty \
-    "
-
-def partImage2ubiVolConfig(d, config):
-    """
-    Convert PARTTIONS_IMAGES['config'] setting format to format expected to feed
-    STM32MP_UBI_VOLUME.
-    Manage <image_name> update by applying the rootfs namming or standard
-    partition image one.
-        FROM: <image_name>,<partition_label>,<mountpoint>,<size>,<type>
-        TO  : <binary_name>,<partition_label>,<size>,<type>
-    """
-    items = d.getVarFlag('PARTITIONS_IMAGES', config).split(',') or ""
-    if len(items) != 5:
-        bb.fatal('Wrong settings for PARTTIONS_IMAGES[%s] : %s' % (config, items))
-    overrides = d.getVar('OVERRIDES')
-    if items[2] == '' and 'openstlinuxcommon' not in overrides.split(':'):
-        bin_suffix = '-${MACHINE}'
-    else:
-        bin_suffix = '-${DISTRO}-${MACHINE}'
-    bin_name = items[0] + bin_suffix + '.' + items[1]
-    # Set string for STM32MP_UBI_VOLUME item: <binary_name>,<partlabel>,<size>,<type>
-    part_format = bin_name + ',' + items[1] + ',' + items[3] + ',' + items[4]
-    return part_format
-
-STM32MP_UBI_VOLUME_nand_4_256 ?= "\
-    ${@' '.join(['%s' % partImage2ubiVolConfig(d, config) for config in d.getVar('PARTITIONS_LIST').split()])} \
-    "
-STM32MP_UBI_VOLUME_spinand_2_128 ?= "\
-    ${@' '.join(['%s' % partImage2ubiVolConfig(d, config) for config in d.getVar('PARTITIONS_LIST').split()])} \
-    "
-
-# Manage specific override for UBI bootfs label name to 'boot' (hardcoded on U-Boot)
-UBI_VOLNAME:pn-${STM32MP_BOOTFS_IMAGE} = "boot"
+EXTRA_UBIFS_SIZE_nand_2_128_256 = "1408"
+# UBI Args for SPI NAND by default on MB1730 (TOSHIBA TC58CVG2S0HRAIJ) 512MB
+# LEB = BLOCK_SIZE - (2 * page size): 256*1024 - (2*4096)
+MKUBIFS_ARGS_nand_4_256_512 = "--min-io-size 4096 --leb-size 253952 --max-leb-cnt 4096"
+UBINIZE_ARGS_nand_4_256_512 = "--min-io-size 4096 --peb-size 256KiB"
+# Set extra size required for UBIFS volume size (KiB)
+EXTRA_UBIFS_SIZE_nand_4_256_512 = "1408"
 
 # Default FSTYPES requested
 WKS_IMAGE_FSTYPES ?= ""
 IMAGE_FSTYPES ?= "${WKS_IMAGE_FSTYPES} tar.xz"
 # Append ext4 FSTYPES to default ones for emmc and sdcard volumes
-IMAGE_FSTYPES += "${@bb.utils.contains_any('BOOTDEVICE_LABELS', 'emmc nor-sdcard sdcard', 'ext4', '', d)}"
+IMAGE_FSTYPES += "${@bb.utils.contains_any('BOOTDEVICE_LABELS', 'emmc nor-sdcard nor-emmc nand-4-256-1024-sdcard sdcard', 'ext4', '', d)}"
 # Append ubi FSTYPES to default ones for nand volumes
-IMAGE_FSTYPES += "${@bb.utils.contains_any('BOOTDEVICE_LABELS', 'nand-4-256 spinand-2-128', 'multiubi', '', d)}"
+IMAGE_FSTYPES += "${@bb.utils.contains_any('BOOTDEVICE_LABELS', 'nand-4-256-1024 nand-2-128-256 nand-4-256-512 nand-4-256-1024-sdcard nand-2-128-256-sdcard nand-4-256-512-sdcard', 'multiubi', '', d)}"
+
+IMAGE_FSTYPES += "${@bb.utils.contains_any('BOOTDEVICE_LABELS', 'nand-4-256-1024-sdcard nand-2-128-256-sdcard nand-4-256-512-sdcard', 'ubootenvmultiubi', '', d)}"
 
 # Define specific EXT4 command line:
 #   - Create minimal inode number (as it is done by default in image_types.bbclass)
@@ -457,126 +215,13 @@ EXTRA_IMAGEDEPENDS:append = " \
     sdcard-raw-tools-native \
     "
 
-# Make sure to provide all expected tools in SDK
-ST_TOOLS_FOR_SDK = " \
-    nativesdk-gcc-arm-none-eabi \
-    nativesdk-binutils \
-    nativesdk-openocd-stm32mp \
-    nativesdk-stm32wrapper4dbg \
-    nativesdk-sdcard-raw-tools \
-    nativesdk-ncurses-libncursesw \
-    "
-
-# Add tools to build native application with SDK
-# Currently mandatory for kernel and u-boot
-ST_TOOLS_FOR_SDK:append = " \
-    nativesdk-cpp-symlinks \
-    nativesdk-gcc-symlinks \
-    "
-
-# For support of perl ansicolor
-ST_TOOLS_FOR_SDK_PERL = " \
-    nativesdk-perl-module-term-ansicolor \
-    nativesdk-perl-module-encode \
-    nativesdk-perl-module-encode-encoding \
-    nativesdk-perl-module-encode-mime-header \
-"
-
-# For some scripts in kernel source code
-ST_TOOLS_FOR_SDK_PERL:append = " \
-    nativesdk-perl-module-file-spec-functions \
-    nativesdk-perl-module-integer \
-    nativesdk-perl-module-pod-text \
-"
-
-ST_TOOLS_FOR_SDK:append = " ${ST_TOOLS_FOR_SDK_PERL} "
-
-# For support of python module for u-boot
-ST_TOOLS_FOR_SDK:append = " \
-    nativesdk-python3-dev \
-    nativesdk-python3-setuptools \
-    nativesdk-swig \
-    nativesdk-dtc \
-    nativesdk-flex \
-    "
-
-# For support of python module for optee-os
-ST_TOOLS_FOR_SDK:append = " \
-    nativesdk-python3-pyelftools \
-    nativesdk-python3-pycryptodomex \
-    nativesdk-python3-pillow \
-    nativesdk-python3-cffi \
-    nativesdk-python3-pycparser \
-    nativesdk-python3-cryptography \
-"
-
-# For support of string convertion (iconv) in SDK
-ST_TOOLS_FOR_SDK:append = " \
-    nativesdk-glibc-gconv-utf-16 \
-    nativesdk-glibc-gconv-utf-32 \
-    "
-# For support wayland-scanner in SDK
-ST_TOOLS_FOR_SDK:append = " \
-    nativesdk-wayland \
-    "
-
-# For Kernel yaml dependency
-ST_TOOLS_FOR_SDK:remove = " \
-    nativesdk-libyaml \
-    nativesdk-libyaml-dev \
-    "
-
-# For CMSIS-SVD file parser with GDB
-ST_TOOLS_FOR_SDK:append = " \
-    nativesdk-svd-tools \
-    "
-
-# For Trusted Application development using OP-TEE TA SDK
-ST_TOOLS_FOR_SDK:append = " \
-    nativesdk-optee-sdk \
-    "
-
-# Fip tool
-ST_TOOLS_FOR_SDK:append = " \
-    nativesdk-${FIPTOOL_WRAPPER} \
-    "
-
-# Make sure to append mkimage to SDK for kernel uImage build
-ST_DEPENDENCIES_BUILD_FOR_SDK = " \
-    ${@bb.utils.contains('KERNEL_IMAGETYPE', 'uImage', 'nativesdk-u-boot-mkimage', '', d)} \
-    ${@bb.utils.contains('KERNEL_ALT_IMAGETYPE', 'uImage', 'nativesdk-u-boot-mkimage', '', d)} \
-  "
-# Make sure to append openssl to SDK for kernel-module and scripts build
-ST_DEPENDENCIES_BUILD_FOR_SDK:append = " nativesdk-openssl-dev "
-
-# Make sure to append bison to SDK for u-boot build
-ST_DEPENDENCIES_BUILD_FOR_SDK:append = " \
-    ${@bb.utils.contains('EXTRA_IMAGEDEPENDS', 'u-boot-stm32mp', 'nativesdk-bison', '', d)} \
-  "
-
-# for populate_sdk, we will have all the tools
-TOOLCHAIN_HOST_TASK:append = " ${ST_TOOLS_FOR_SDK} "
-TOOLCHAIN_HOST_TASK:append = " ${ST_DEPENDENCIES_BUILD_FOR_SDK} "
-# for populate_sdk_ext, the tools are not desired as mandatory tools (aka basic
-# tools for devtool)
-TOOLCHAIN_HOST_TASK:remove:task-populate-sdk-ext = " ${ST_TOOLS_FOR_SDK} "
-TOOLCHAIN_HOST_TASK:remove:task-populate-sdk-ext = " ${ST_DEPENDENCIES_BUILD_FOR_SDK} "
-# buildtools is used only by populate_sdk_ext
-# populate_sdk_ext = buildtools + uninative + layer
-# buildtools: sdk part of esdk (like sdk generated by populate_sdk)
-# uninative: basic tools for devtool
-TOOLCHAIN_HOST_TASK:remove:pn-buildtools-tarball = " ${ST_TOOLS_FOR_SDK_PERL} "
-
-TOOLCHAIN_TARGET_TASK += " bash-dev libgomp-dev"
-TOOLCHAIN_TARGET_TASK:remove:pn-buildtools-tarball = " bash-dev libgomp-dev"
-
 # =========================================================================
 # Signing configuration
 # =========================================================================
 ENCRYPT_ENABLE ?= "0"
 ENCRYPT_SUFFIX ?= "_Encrypted"
 
-SIGN_ENABLE ?= "0"
+SIGN_ENABLE ?= "${@bb.utils.contains('ENCRYPT_ENABLE', '1', '1', '0', d)}"
 SIGN_SUFFIX ?= "_Signed"
 
 # =========================================================================
@@ -589,13 +234,19 @@ ST_DEBUG_TRACE ?= "1"
 # Kernel
 # =========================================================================
 # Kernel image type
+KERNEL_DEFAULT_NAME = "uImage"
+KERNEL_DEFAULT_NAME:aarch64 = "Image.gz"
+
+# arm32 bits
 KERNEL_EFI_NAME = "${@bb.utils.contains('MACHINE_FEATURES', 'efi', 'zImage', 'uImage', d)}"
 KERNEL_EFI_ALT_NAME = "${@bb.utils.contains('MACHINE_FEATURES', 'efi', 'uImage', 'zImage', d)}"
+# arm64 bits
+KERNEL_EFI_NAME:aarch64 = "${@bb.utils.contains('MACHINE_FEATURES', 'efi', 'Image', 'Image.gz', d)}"
+KERNEL_EFI_ALT_NAME:aarch64 = "${@bb.utils.contains('MACHINE_FEATURES', 'efi', 'Image.gz', 'Image', d)}"
 
-KERNEL_IMAGETYPE     =  "${@bb.utils.contains('MACHINE_FEATURES', 'fit', 'fitImage', '${KERNEL_EFI_NAME}', d)}"
-KERNEL_ALT_IMAGETYPE =  " Image "
-KERNEL_ALT_IMAGETYPE =+ " vmlinux "
-KERNEL_ALT_IMAGETYPE =+ " ${@bb.utils.contains('MACHINE_FEATURES', 'fit', 'uImage', '${KERNEL_EFI_ALT_NAME}', d)} "
+KERNEL_IMAGETYPE     = "${@bb.utils.contains('MACHINE_FEATURES', 'fit', 'fitImage', '${KERNEL_EFI_NAME}', d)}"
+KERNEL_ALT_IMAGETYPE = " vmlinux "
+KERNEL_ALT_IMAGETYPE =+ " ${@bb.utils.contains('MACHINE_FEATURES', 'fit', '${KERNEL_DEFAULT_NAME}', '${KERNEL_EFI_ALT_NAME}', d)} "
 
 KERNEL_CLASSES = " ${@bb.utils.contains('MACHINE_FEATURES', 'fit', 'kernel-fitimage', 'kernel-uimage', d)} "
 
@@ -611,9 +262,12 @@ UBOOT_ENTRYPOINT = "0xC4000000"
 
 # List of device tree to install
 KERNEL_DEVICETREE ?= "${STM32MP_KERNEL_DEVICETREE}"
-STM32MP_KERNEL_DEVICETREE += "${@' '.join('%s.dtb' % d for d in '${STM32MP_DEVICETREE}'.split())}"
-STM32MP_KERNEL_DEVICETREE += "${@' '.join('%s.dtb' % d for d in '${CUBE_M4_EXAMPLES_DT}'.split())}"
-STM32MP_KERNEL_DEVICETREE += "${@' '.join('%s.dtb' % d for d in '${LINUX_A7_EXAMPLES_DT}'.split())}"
+KERNEL_SUB_PATH = "st/"
+
+STM32MP_KERNEL_DEVICETREE += "${@' '.join('${KERNEL_SUB_PATH}%s.dtb' % d for d in '${STM32MP_DEVICETREE}'.split())}"
+STM32MP_KERNEL_DEVICETREE += "${@' '.join('${KERNEL_SUB_PATH}%s.dtb' % d for d in '${CUBE_M4_EXAMPLES_DT}'.split())}"
+STM32MP_KERNEL_DEVICETREE += "${@' '.join('${KERNEL_SUB_PATH}%s.dtb' % d for d in '${LINUX_A7_EXAMPLES_DT}'.split())}"
+STM32MP_KERNEL_DEVICETREE += "${@' '.join('${KERNEL_SUB_PATH}%s.dtb' % d for d in '${CUBE_M33_EXAMPLES_DT}'.split())}"
 
 # Set LOADADDR
 # Set this address to 0xC2000040, which is 0xC2000000 + 0x40.
@@ -625,73 +279,87 @@ ST_KERNEL_LOADADDR ?= "0xC2000040"
 LINUX_A7_EXAMPLES_DT ?= ""
 
 ST_CMD_LINE_DEBUG_TRACE ?= "loglevel=1 quiet"
+
 # =========================================================================
 # u-boot
 # =========================================================================
-EXTRA_IMAGEDEPENDS += "virtual/bootloader"
-
 # Define default U-Boot config
-UBOOT_CONFIG = ""
-
+UBOOT_CONFIG ?= ""
 # STM32mp15
-UBOOT_CONFIG:append:stm32mp15common = " ${@bb.utils.contains_any('BOOTSCHEME_LABELS', 'optee', 'trusted_stm32mp15', '', d)} "
-
+UBOOT_CONFIG:append:stm32mp15common = " ${@bb.utils.contains_any('BOOTSCHEME_LABELS', 'optee opteemin', 'default_stm32mp15', '', d)} "
+UBOOT_CONFIG:append:stm32mp15common = " ${@bb.utils.contains('STM32MP_DEVICETREE_PROGRAMMER_ENABLE', '1', 'programmer_stm32mp15', '', d)} "
+UBOOT_CONFIG:append:stm32mp15common = " ${@bb.utils.contains_any('BOOTSCHEME_LABELS', 'fastboot fastboot-opteemin', bb.utils.contains('BOOTDEVICE_LABELS', 'sdcard', 'fastboot-sdcard_stm32mp15', '', d), '', d)} "
+UBOOT_CONFIG:append:stm32mp15common = " ${@bb.utils.contains_any('BOOTSCHEME_LABELS', 'fastboot fastboot-opteemin', bb.utils.contains('BOOTDEVICE_LABELS', 'emmc', 'fastboot-emmc_stm32mp15', '', d), '', d)} "
 # STM32mp13
-UBOOT_CONFIG:append:stm32mp13common = " ${@bb.utils.contains_any('BOOTSCHEME_LABELS', 'optee', 'trusted_stm32mp13', '', d)} "
+UBOOT_CONFIG:append:stm32mp13common = " ${@bb.utils.contains_any('BOOTSCHEME_LABELS', 'optee opteemin', 'default_stm32mp13', '', d)} "
+UBOOT_CONFIG:append:stm32mp13common = " ${@bb.utils.contains('STM32MP_DEVICETREE_PROGRAMMER_ENABLE', '1', 'programmer_stm32mp13', '', d)} "
+UBOOT_CONFIG:append:stm32mp13common = " ${@bb.utils.contains_any('BOOTSCHEME_LABELS', 'fastboot fastboot-opteemin', bb.utils.contains('BOOTDEVICE_LABELS', 'sdcard', 'fastboot-sdcard_stm32mp13', '', d), '', d)} "
 
-# Select u-boot binary that needs specific devicetree suffix (from UBOOT_DEVICETREE)
-# 'u-boot-nodtb.bin' and 'u-boot.dtb' : prefer 'u-boot.dtb' binary as 'u-boot-nodtb.bin'
-# doesn't need any devicetree suffix (specific case for 'u-boot-nodtb' binary
-# implemented on u-boot-stm32mp recipe)
-# Define u-boot defconfig and binary to use for each UBOOT_CONFIG
-UBOOT_CONFIG[trusted_stm32mp15] = "stm32mp15_defconfig,,u-boot.dtb"
-UBOOT_CONFIG[trusted_stm32mp13] = "stm32mp13_defconfig,,u-boot.dtb"
+# STM32mp21
+UBOOT_CONFIG:append:stm32mp21common = " ${@bb.utils.contains_any('BOOTSCHEME_LABELS', 'optee opteemin', 'default_stm32mp21', '', d)} "
+UBOOT_CONFIG:append:stm32mp21common = " ${@bb.utils.contains('STM32MP_DEVICETREE_PROGRAMMER_ENABLE', '1', 'programmer_stm32mp21', '', d)} "
+UBOOT_CONFIG:append:stm32mp21common = " ${@bb.utils.contains_any('BOOTSCHEME_LABELS', 'fastboot fastboot-opteemin', bb.utils.contains('BOOTDEVICE_LABELS', 'sdcard', 'fastboot-sdcard_stm32mp21', '', d), '', d)} "
+UBOOT_CONFIG:append:stm32mp21common = " ${@bb.utils.contains_any('BOOTSCHEME_LABELS', 'fastboot fastboot-opteemin', bb.utils.contains('BOOTDEVICE_LABELS', 'emmc', 'fastboot-emmc_stm32mp21', '', d), '', d)} "
+# STM32mp23
+UBOOT_CONFIG:append:stm32mp23common = " ${@bb.utils.contains_any('BOOTSCHEME_LABELS', 'optee opteemin', 'default_stm32mp23', '', d)} "
+UBOOT_CONFIG:append:stm32mp23common = " ${@bb.utils.contains('STM32MP_DEVICETREE_PROGRAMMER_ENABLE', '1', 'programmer_stm32mp23', '', d)} "
+UBOOT_CONFIG:append:stm32mp23common = " ${@bb.utils.contains_any('BOOTSCHEME_LABELS', 'fastboot fastboot-opteemin', bb.utils.contains('BOOTDEVICE_LABELS', 'sdcard', 'fastboot-sdcard_stm32mp23', '', d), '', d)} "
+UBOOT_CONFIG:append:stm32mp23common = " ${@bb.utils.contains_any('BOOTSCHEME_LABELS', 'fastboot fastboot-opteemin', bb.utils.contains('BOOTDEVICE_LABELS', 'emmc', 'fastboot-emmc_stm32mp23', '', d), '', d)} "
 
-# List of U-Boot device tree to use
-UBOOT_DEVICETREE = "${STM32MP_DEVICETREE}"
+# STM32mp25
+UBOOT_CONFIG:append:stm32mp25common = " ${@bb.utils.contains_any('BOOTSCHEME_LABELS', 'optee opteemin', 'default_stm32mp25', '', d)} "
+UBOOT_CONFIG:append:stm32mp25common = " ${@bb.utils.contains('STM32MP_DEVICETREE_PROGRAMMER_ENABLE', '1', 'programmer_stm32mp25', '', d)} "
+UBOOT_CONFIG:append:stm32mp25common = " ${@bb.utils.contains_any('BOOTSCHEME_LABELS', 'fastboot fastboot-opteemin', bb.utils.contains('BOOTDEVICE_LABELS', 'sdcard', 'fastboot-sdcard_stm32mp25', '', d), '', d)} "
+UBOOT_CONFIG:append:stm32mp25common = " ${@bb.utils.contains_any('BOOTSCHEME_LABELS', 'fastboot fastboot-opteemin', bb.utils.contains('BOOTDEVICE_LABELS', 'emmc', 'fastboot-emmc_stm32mp25', '', d), '', d)} "
 
 # Define U-boot splashscreen file naming
 UBOOT_SPLASH_PORTRAIT_IMAGE = "splash_portrait"
 UBOOT_SPLASH_LANDSCAPE_IMAGE = "splash_landscape"
 
-# Enable MTDPART check for UBOOT_CONFIG
-UBOOT_MTDPART_CHECK_ENABLE = ""
-
-# Set U-Boot MTD partition configurations
-UBOOT_MTDPART_NAND_BOOT    ?= "${@','.join(['%sk(%s)' % (align_size(d, 'NAND', l.split(',')[2], l.split(',')[4]), l.split(',')[1]) for l in d.getVarFlag('PARTITIONS_BOOTLOADER_CONFIG', 'nand-4-256').split()])}"
-UBOOT_MTDPART_NOR_BOOT     ?= "${@','.join(['%sk(%s)' % (align_size(d, 'NOR', l.split(',')[2], l.split(',')[4]), l.split(',')[1]) for l in d.getVarFlag('PARTITIONS_BOOTLOADER_CONFIG', 'nor-sdcard').split()])}"
-UBOOT_MTDPART_SPINAND_BOOT ?= "${@','.join(['%sk(%s)' % (align_size(d, 'SPINAND', l.split(',')[2], l.split(',')[4]), l.split(',')[1]) for l in d.getVarFlag('PARTITIONS_BOOTLOADER_CONFIG', 'spinand-2-128').split()])}"
-
-UBOOT_MTDPART_CHECK ?= "\
-    ${@bb.utils.contains('BOOTDEVICE_LABELS', 'nand-4-256', 'CONFIG_MTDPARTS_NAND0_BOOT=${UBOOT_MTDPART_NAND_BOOT}', '', d)} \
-    ${@bb.utils.contains('BOOTDEVICE_LABELS', 'nor-sdcard', 'CONFIG_MTDPARTS_NOR0_BOOT=${UBOOT_MTDPART_NOR_BOOT}', '', d)} \
-    ${@bb.utils.contains('BOOTDEVICE_LABELS', 'spinand-2-128', 'CONFIG_MTDPARTS_SPINAND0_BOOT=${UBOOT_MTDPART_SPINAND_BOOT}', '', d)} \
-    "
-
-PREFERRED_PROVIDER_u-boot-fw-utils:stm32mp1common = "libubootenv"
+PREFERRED_PROVIDER_u-boot-fw-utils:stm32mp1common ??= "libubootenv"
 
 MACHINE_EXTRA_RRECOMMENDS:append:stm32mp1common = " \
     u-boot-fw-config-stm32mp \
 "
 
 ST_UBOOT_DEBUG_TRACE ?= "${@bb.utils.contains('ST_DEBUG_TRACE', '1', '1', '0', d)}"
+
 # =========================================================================
 # trusted-firmware-a
 # =========================================================================
 # Add optionnaly trusted-firmware-a
-EXTRA_IMAGEDEPENDS += "${@bb.utils.contains('BOOTSCHEME_LABELS', 'optee', 'virtual/trusted-firmware-a', '', d)}"
+EXTRA_IMAGEDEPENDS += "virtual/trusted-firmware-a"
+# Add optionnaly trusted-firmware-m
+EXTRA_IMAGEDEPENDS += "${@bb.utils.contains('MACHINE_FEATURES', 'm33td', 'virtual/trusted-firmware-m', '', d)}"
+
+# Configure the TF-A tool platform to use to generate the TF-A tools
+TF_A_TOOLS_PLATFORM ?= "stm32mp2"
 
 # Configure trusted-firmware-a build
-TF_A_CONFIG += "${@bb.utils.contains('BOOTSCHEME_LABELS', 'optee', 'optee', '', d)}"
 # Manage specific config settings
-TF_A_CONFIG += "${@bb.utils.contains('BOOTDEVICE_LABELS', 'emmc', 'emmc', '', d)}"
-TF_A_CONFIG += "${@bb.utils.contains('BOOTDEVICE_LABELS', 'nand-4-256', 'nand', '', d)}"
-TF_A_CONFIG += "${@bb.utils.contains('BOOTDEVICE_LABELS', 'nor-sdcard', 'nor', '', d)}"
-TF_A_CONFIG += "${@bb.utils.contains('BOOTDEVICE_LABELS', 'sdcard', 'sdcard', '', d)}"
-TF_A_CONFIG += "${@bb.utils.contains('BOOTDEVICE_LABELS', 'spinand-2-128', 'spinand', '', d)}"
-TF_A_CONFIG += "${@bb.utils.contains('BOOTDEVICE_LABELS', 'nor', 'nor', '', d)}"
-TF_A_CONFIG += "uart"
-TF_A_CONFIG += "usb"
+TF_A_CONFIG += "${@bb.utils.contains('BOOTSCHEME_LABELS', 'optee', bb.utils.contains('BOOTDEVICE_LABELS', 'emmc', 'optee-emmc', '', d), '', d)}"
+TF_A_CONFIG += "${@bb.utils.contains('BOOTSCHEME_LABELS', 'optee', bb.utils.contains_any('BOOTDEVICE_LABELS', 'nand-4-256-1024 nand-4-256-1024-sdcard', 'optee-nand', '', d), '', d)}"
+TF_A_CONFIG += "${@bb.utils.contains('BOOTSCHEME_LABELS', 'optee', bb.utils.contains_any('BOOTDEVICE_LABELS', 'nor nor-sdcard', 'optee-nor', '', d), '', d)}"
+TF_A_CONFIG += "${@bb.utils.contains('BOOTSCHEME_LABELS', 'optee', bb.utils.contains('BOOTDEVICE_LABELS', 'sdcard', 'optee-sdcard', '', d), '', d)}"
+TF_A_CONFIG += "${@bb.utils.contains('BOOTSCHEME_LABELS', 'optee', bb.utils.contains_any('BOOTDEVICE_LABELS', 'nand-2-128-256 nand-2-128-256-sdcard nand-4-256-512 nand-4-256-512-sdcard', 'optee-spinand', '', d), '', d)}"
+TF_A_CONFIG += "${@bb.utils.contains('BOOTSCHEME_LABELS', 'optee', bb.utils.contains('STM32MP_DEVICETREE_PROGRAMMER_ENABLE', '1', 'optee-programmer-usb optee-programmer-uart', ' usb uart', d), '', d)}"
+TF_A_CONFIG += "${@bb.utils.contains('BOOTSCHEME_LABELS', 'opteemin', bb.utils.contains('BOOTDEVICE_LABELS', 'emmc', 'opteemin-emmc', '', d), '', d)}"
+TF_A_CONFIG += "${@bb.utils.contains('BOOTSCHEME_LABELS', 'opteemin', bb.utils.contains_any('BOOTDEVICE_LABELS', 'nand-4-256-1024 nand-4-256-1024-sdcard', 'opteemin-nand', '', d), '', d)}"
+TF_A_CONFIG += "${@bb.utils.contains('BOOTSCHEME_LABELS', 'opteemin', bb.utils.contains_any('BOOTDEVICE_LABELS', 'nor nor-sdcard', 'opteemin-nor', '', d), '', d)}"
+TF_A_CONFIG += "${@bb.utils.contains('BOOTSCHEME_LABELS', 'opteemin', bb.utils.contains('BOOTDEVICE_LABELS', 'sdcard', 'opteemin-sdcard', '', d), '', d)}"
+TF_A_CONFIG += "${@bb.utils.contains('BOOTSCHEME_LABELS', 'opteemin', bb.utils.contains_any('BOOTDEVICE_LABELS', 'nand-2-128-256 nand-2-128-256-sdcard nand-4-256-512 nand-4-256-512-sdcard', 'opteemin-spinand', '', d), '', d)}"
+TF_A_CONFIG += "${@bb.utils.contains('BOOTSCHEME_LABELS', 'opteemin', bb.utils.contains('STM32MP_DEVICETREE_PROGRAMMER_ENABLE', '1', 'opteemin-programmer-usb opteemin-programmer-uart', 'usb uart', d), '', d)}"
+
+# Make sure to add the SDCARD support for m33td nor-sdcard
+TF_A_CONFIG += "${@bb.utils.contains('BOOTDEVICE_LABELS', 'nor-sdcard', bb.utils.contains('MACHINE_FEATURES', 'm33td', 'optee-sdcard', '', d), '', d)}"
+FIP_CONFIG += "${@bb.utils.contains('BOOTDEVICE_LABELS', 'nor-sdcard', bb.utils.contains('MACHINE_FEATURES', 'm33td', 'optee-sdcard', '', d), '', d)}"
+# Make sure to add the EMMC support for m33td nor-emmc
+TF_A_CONFIG += "${@bb.utils.contains('BOOTDEVICE_LABELS', 'nor-emmc', bb.utils.contains('MACHINE_FEATURES', 'm33td', 'optee-emmc', '', d), '', d)}"
+FIP_CONFIG += "${@bb.utils.contains('BOOTDEVICE_LABELS', 'nor-emmc', bb.utils.contains('MACHINE_FEATURES', 'm33td', 'optee-emmc', '', d), '', d)}"
+
+# Remove the 'optee-nor' configuration for both TF-A and FIP
+TF_A_CONFIG:remove = "${@bb.utils.contains('BOOTDEVICE_LABELS', 'optee', bb.utils.contains('MACHINE_FEATURES', 'm33td', 'optee-nor', '', d), '', d)}"
+FIP_CONFIG:remove = "${@bb.utils.contains('BOOTDEVICE_LABELS', 'optee', bb.utils.contains('MACHINE_FEATURES', 'm33td', 'optee-nor', '', d), '', d)}"
 
 # Append SSP config to TF_A_CONFIG
 TF_A_SSP_ENABLE ?= "0"
@@ -706,29 +374,62 @@ TF_A_ENABLE_METADATA ?= "${@bb.utils.contains('MACHINE_FEATURES', 'fw-update', '
 TF_A_METADATA_BINARY ?= "metadata.bin"
 
 # Configure the default MTD_START_OFFSET
-TF_A_MTD_START_OFFSET_NAND    ?= "0x00200000"
-TF_A_MTD_START_OFFSET_NOR     ?= "${@bb.utils.contains('MACHINE_FEATURES', 'fw-update', '0x00080000', '0x00100000', d)}"
-TF_A_MTD_START_OFFSET_SPINAND ?= "0x00200000"
+TF_A_MTD_START_OFFSET_NAND    ?= "${@bb.utils.contains('ENABLE_FLASHLAYOUT_CONFIG_FWUP', '0', '0x00100000', '0x00200000', d)}"
+TF_A_MTD_START_OFFSET_NOR     ?= "${@bb.utils.contains('ENABLE_FLASHLAYOUT_CONFIG_FWUP', '0', '0x00080000', '0x00100000', d)}"
+TF_A_MTD_START_OFFSET_SPINAND ?= "${@bb.utils.contains('ENABLE_FLASHLAYOUT_CONFIG_FWUP', '0', '0x00100000', '0x00200000', d)}"
 
 ST_TF_A_DEBUG_TRACE ?= "${@bb.utils.contains('ST_DEBUG_TRACE', '1', '1', '0', d)}"
+
+# =========================================================================
+# trusted-firmware-m
+# =========================================================================
+# Add optionnaly trusted-firmware-m
+# List of trusted-firmware-m device tree to use
+TF_M_DEVICETREE ?= "${STM32MP_DEVICETREE}"
+
 # =========================================================================
 # optee
 # =========================================================================
-# Map OPTEE configuration to device tree list
-OPTEE_CONF = "${STM32MP_DEVICETREE}"
+## Map OPTEE configuration to device tree list
+OPTEE_CONFIG += "${@bb.utils.contains('BOOTSCHEME_LABELS', 'optee', 'optee', '', d)}"
+OPTEE_CONFIG += "${@bb.utils.contains('BOOTSCHEME_LABELS', 'opteemin', 'opteemin', '', d)}"
 
 ST_OPTEE_DEBUG_TRACE ?= "${@bb.utils.contains('ST_DEBUG_TRACE', '1', '1', '0', d)}"
+
+# =========================================================================
+# M33Project
+# =========================================================================
+# Trustzone enable or not on M33 co-processor
+# if Trustzone is enabled, that mean we need to have TF-M as dependency
+# By default, it's enabled
+M33PROJECT_TF_M_TRUSTZONE ??= "1"
+
 # =========================================================================
 # fip
 # =========================================================================
+# Add fip binaries generation
+EXTRA_IMAGEDEPENDS += "fip-stm32mp"
+
 # Configure fip build
-FIP_CONFIG += "${@bb.utils.contains('BOOTSCHEME_LABELS', 'optee', 'optee', '', d)}"
+FIP_CONFIG += "${@bb.utils.contains('BOOTSCHEME_LABELS', 'optee', bb.utils.contains('BOOTDEVICE_LABELS', 'emmc', 'optee-emmc', '', d), '', d)}"
+FIP_CONFIG += "${@bb.utils.contains('BOOTSCHEME_LABELS', 'optee', bb.utils.contains_any('BOOTDEVICE_LABELS', 'nand-2-128-256 nand-2-128-256-sdcard nand-4-256-512 nand-4-256-512-sdcard', 'optee-spinand', '', d), '', d)}"
+FIP_CONFIG += "${@bb.utils.contains('BOOTSCHEME_LABELS', 'optee', bb.utils.contains_any('BOOTDEVICE_LABELS', 'nand-4-256-1024 nand-4-256-1024-sdcard', 'optee-nand', '', d), '', d)}"
+FIP_CONFIG += "${@bb.utils.contains('BOOTSCHEME_LABELS', 'optee', bb.utils.contains_any('BOOTDEVICE_LABELS', 'nor nor-sdcard', 'optee-nor', '', d), '', d)}"
+FIP_CONFIG += "${@bb.utils.contains('BOOTSCHEME_LABELS', 'optee', bb.utils.contains('BOOTDEVICE_LABELS', 'sdcard', 'optee-sdcard', '', d), '', d)}"
+FIP_CONFIG += "${@bb.utils.contains('BOOTSCHEME_LABELS', 'optee', bb.utils.contains('STM32MP_DEVICETREE_PROGRAMMER_ENABLE', '1', 'optee-programmer-${STMP32MP_PROGRAMMER_SERIAL}', '', d), '', d)}"
 
-# Define config for each FIP_CONFIG
-FIP_CONFIG[optee]   ?= "optee,${FIP_DEVICETREE_OPTEE}"
+FIP_CONFIG += "${@bb.utils.contains('BOOTSCHEME_LABELS', 'optee', bb.utils.contains('BOOTSCHEME_LABELS', 'fastboot', bb.utils.contains('BOOTDEVICE_LABELS', 'emmc', 'fastboot-emmc', '', d), '', d), '', d)}"
+FIP_CONFIG += "${@bb.utils.contains('BOOTSCHEME_LABELS', 'optee', bb.utils.contains('BOOTSCHEME_LABELS', 'fastboot', bb.utils.contains('BOOTDEVICE_LABELS', 'sdcard', 'fastboot-sdcard', '', d), '', d), '', d)}"
 
-# List of device tree to use for fip binary creation
-FIP_DEVICETREE_OPTEE   ?= "${STM32MP_DEVICETREE}"
+FIP_CONFIG += "${@bb.utils.contains('BOOTSCHEME_LABELS', 'opteemin', bb.utils.contains('BOOTDEVICE_LABELS', 'emmc', 'opteemin-emmc', '', d), '', d)}"
+FIP_CONFIG += "${@bb.utils.contains('BOOTSCHEME_LABELS', 'opteemin', bb.utils.contains_any('BOOTDEVICE_LABELS', 'nand-2-128-256 nand-2-128-256-sdcard nand-4-256-512 nand-4-256-512-sdcard', 'opteemin-spinand', '', d), '', d)}"
+FIP_CONFIG += "${@bb.utils.contains('BOOTSCHEME_LABELS', 'opteemin', bb.utils.contains_any('BOOTDEVICE_LABELS', 'nand-4-256-1024 nand-4-256-1024-sdcard', 'opteemin-nand', '', d), '', d)}"
+FIP_CONFIG += "${@bb.utils.contains('BOOTSCHEME_LABELS', 'opteemin', bb.utils.contains_any('BOOTDEVICE_LABELS', 'nor nor-sdcard', 'opteemin-nor', '', d), '', d)}"
+FIP_CONFIG += "${@bb.utils.contains('BOOTSCHEME_LABELS', 'opteemin', bb.utils.contains('BOOTDEVICE_LABELS', 'sdcard', 'opteemin-sdcard', '', d), '', d)}"
+FIP_CONFIG += "${@bb.utils.contains('BOOTSCHEME_LABELS', 'opteemin', bb.utils.contains('STM32MP_DEVICETREE_PROGRAMMER_ENABLE', '1', 'opteemin-programmer-${STMP32MP_PROGRAMMER_SERIAL}', '', d), '', d)}"
+
+FIP_CONFIG += "${@bb.utils.contains('BOOTSCHEME_LABELS', 'opteemin', bb.utils.contains('BOOTSCHEME_LABELS', 'fastboot-opteemin', bb.utils.contains('BOOTDEVICE_LABELS', 'emmc', 'fastboot-opteemin-emmc', '', d), '', d), '', d)}"
+FIP_CONFIG += "${@bb.utils.contains('BOOTSCHEME_LABELS', 'opteemin', bb.utils.contains('BOOTSCHEME_LABELS', 'fastboot-opteemin', bb.utils.contains('BOOTDEVICE_LABELS', 'sdcard', 'fastboot-opteemin-sdcard', '', d), '', d), '', d)}"
 
 # Define fiptool wrapper name
 FIPTOOL_WRAPPER ?= "fiptool-stm32mp"
@@ -736,6 +437,36 @@ FIPTOOL_WRAPPER ?= "fiptool-stm32mp"
 # Manage specific config to sign FIP
 FIP_SIGN_SUFFIX ?= "${@bb.utils.contains('SIGN_ENABLE', '1', '${SIGN_SUFFIX}', '', d)}"
 FIP_ENCRYPT_SUFFIX ?= "${@bb.utils.contains('ENCRYPT_ENABLE', '1', '${ENCRYPT_SUFFIX}', '', d)}"
+
+# Configure use of BL31
+FIP_BL31_ENABLE = "0"
+FIP_BL31_ENABLE:stm32mp2common = "1"
+
+# -----------------------------------------------
+# Define config for each FIP_CONFIG
+#   FIP_CONFIG[config] ?= "<bl32_conf>,<dt_conf>,<search_conf>,<device_conf>"
+#
+FIP_CONFIG[optee-emmc]    ?= "optee,${STM32MP_DT_FILES_EMMC},default:optee"
+FIP_CONFIG[optee-nand]    ?= "optee,${STM32MP_DT_FILES_NAND},default:optee"
+FIP_CONFIG[optee-nor]     ?= "optee,${STM32MP_DT_FILES_NOR},default:optee"
+FIP_CONFIG[optee-sdcard]  ?= "optee,${STM32MP_DT_FILES_SDCARD},default:optee"
+FIP_CONFIG[optee-spinand] ?= "optee,${STM32MP_DT_FILES_SPINAND},default:optee"
+FIP_CONFIG[optee-programmer-uart] ?= "optee,${STM32MP_DEVICETREE_PROGRAMMER},programmer:optee-programmer-uart:optee,uart"
+FIP_CONFIG[optee-programmer-usb]  ?= "optee,${STM32MP_DEVICETREE_PROGRAMMER},programmer:optee-programmer-usb:optee,usb"
+
+FIP_CONFIG[fastboot-emmc]   ?= "optee,${STM32MP_DT_FILES_EMMC},fastboot-emmc:optee,optee-programmer-usb"
+FIP_CONFIG[fastboot-sdcard] ?= "optee,${STM32MP_DT_FILES_SDCARD},fastboot-sdcard:optee,optee-programmer-usb"
+
+FIP_CONFIG[opteemin-emmc]    ?= "optee,${STM32MP_DT_FILES_EMMC},default:opteemin"
+FIP_CONFIG[opteemin-nand]    ?= "optee,${STM32MP_DT_FILES_NAND},default:opteemin"
+FIP_CONFIG[opteemin-nor]     ?= "optee,${STM32MP_DT_FILES_NOR},default:opteemin"
+FIP_CONFIG[opteemin-sdcard]  ?= "optee,${STM32MP_DT_FILES_SDCARD},default:opteemin"
+FIP_CONFIG[opteemin-spinand] ?= "optee,${STM32MP_DT_FILES_SPINAND},default:opteemin"
+FIP_CONFIG[opteemin-programmer-uart] ?= "optee,${STM32MP_DEVICETREE_PROGRAMMER},programmer:opteemin-programmer-uart:opteemin,uart"
+FIP_CONFIG[opteemin-programmer-usb] ?= "optee,${STM32MP_DEVICETREE_PROGRAMMER},programmer:opteemin-programmer-usb:opteemin,usb"
+
+FIP_CONFIG[fastboot-opteemin-emmc]   ?= "optee,${STM32MP_DT_FILES_EMMC},fastboot-emmc:opteemin,opteemin-emmc"
+FIP_CONFIG[fastboot-opteemin-sdcard] ?= "optee,${STM32MP_DT_FILES_SDCARD},fastboot-sdcard:opteemin,opteemin-sdcard"
 
 # =========================================================================
 # Xserver
@@ -753,11 +484,6 @@ FIP_ENCRYPT_SUFFIX ?= "${@bb.utils.contains('ENCRYPT_ENABLE', '1', '${ENCRYPT_SU
 ELF_DEBUG_ENABLE = "1"
 
 # =========================================================================
-# sysdig
-# =========================================================================
-PREFERRED_PROVIDER_sysdig = "sysdig-stm32mp"
-
-# =========================================================================
 # M4 copro
 # =========================================================================
 # Define the devicetree for M4 examples
@@ -772,10 +498,29 @@ M4_INSTALLDIR = "${STM32MP_USERFS_MOUNTPOINT}"
 M4_PACKAGE_4USERFS = "${@bb.utils.contains('ST_USERFS','1','1','0',d)}"
 
 # =========================================================================
+# M33 copro
+# =========================================================================
+# Define the devicetree for M33 examples
+CUBE_M33_EXAMPLES_DT ?= ""
+
+# Define M33 example installation dir
+M33_INSTALLDIR = "${STM32MP_USERFS_MOUNTPOINT}"
+M33_PACKAGE_4USERFS = "${@bb.utils.contains('ST_USERFS','1','1','0',d)}"
+
+# =========================================================================
 # GCNANO userland configuration
 # =========================================================================
 # Configure use of vendorfs if enable to install gcnano libs
 GCNANO_USERLAND_OUTPUT_LIBDIR = "${@bb.utils.contains('ST_VENDORFS', '1', '${STM32MP_VENDORFS_MOUNTPOINT}/lib', '${libdir}', d)}"
+
+# =========================================================================
+# WESTON HDMI configuration
+# =========================================================================
+# Configure the size screen use by weston with HDMI screen
+# 720p: 1280x720
+# 1080p: 1920x1080
+WESTON_HDMI_MODE:stm32mp1common ?= "1280x720"
+WESTON_HDMI_MODE:stm32mp2common ?= "1920x1080"
 
 # =========================================================================
 # EFI configuration
