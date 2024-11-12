@@ -151,6 +151,9 @@ SIGN_TOOL_EXTRA_stm32mp25 = " --header-version 2.2 ${@bb.utils.contains('ENCRYPT
 # Enable use of work-shared folder
 TFA_SHARED_SOURCES ??= "1"
 STAGING_TFA_DIR = "${TMPDIR}/work-shared/${MACHINE}/tfa-source"
+DEBUG_PREFIX_MAP += " ${@bb.utils.contains('TFA_SHARED_SOURCES', '1', '-fmacro-prefix-map=${STAGING_TFA_DIR}=${TARGET_DBGSRC_DIR}', '', d)} "
+DEBUG_PREFIX_MAP += " ${@bb.utils.contains('TFA_SHARED_SOURCES', '1', '-fdebug-prefix-map=${STAGING_TFA_DIR}=${TARGET_DBGSRC_DIR}', '', d)} "
+
 # Make sure to move ${S} to STAGING_TFA_DIR. We can't just
 # create the symlink in advance as the git fetcher can't cope with
 # the symlink.

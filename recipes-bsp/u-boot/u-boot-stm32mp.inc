@@ -24,6 +24,9 @@ UBOOT_ELF = "${@'u-boot' if d.getVar('ELF_DEBUG_ENABLE') == '1' else ''}"
 # -----------------------------------------------
 # Enable use of work-shared folder
 STAGING_UBOOT_DIR = "${TMPDIR}/work-shared/${MACHINE}/uboot-source"
+DEBUG_PREFIX_MAP += " -fmacro-prefix-map=${STAGING_UBOOT_DIR}=${TARGET_DBGSRC_DIR} "
+DEBUG_PREFIX_MAP += " -fdebug-prefix-map=${STAGING_UBOOT_DIR}=${TARGET_DBGSRC_DIR} "
+
 # Make sure to move ${S} to STAGING_UBOOT_DIR. We can't just
 # create the symlink in advance as the git fetcher can't cope with
 # the symlink.
