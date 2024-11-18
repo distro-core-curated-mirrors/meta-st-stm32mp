@@ -128,7 +128,7 @@ optee-deploy := \$(foreach config, \$(OPTEE_CONFIG), \$(foreach soc, ${STM32MP_S
 
 optee-compile:= \$(foreach config, \$(OPTEE_CONFIG), \$(foreach soc, ${STM32MP_SOC_NAME}, \$(foreach dt, \$(if \$(CFG_EMBED_DTB_SOURCE_FILE), \$(CFG_EMBED_DTB_SOURCE_FILE),\$(OPTEE_DEVICETREE_\$(config))), \$(if \$(findstring \$(soc),\$(dt)), tee-\$(config)-\$(soc)-\$(dt),) )))
 
-optee: \$(optee-compile)
+optee: \$(optee-compile) \$(optee-deploy)
 
 fip: \$(optee-deploy)
 	for fipconfig in \$(FIP_CONFIG) ; do \\

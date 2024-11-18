@@ -189,9 +189,9 @@ To compile U-Boot source code:
     $ make -f $PWD/../Makefile.sdk all
 To compile U-Boot source code for a specific config:
   - Compile default U-Boot configuration but applying specific devicetree(s):
-    $ make -f $PWD/../Makefile.sdk DEVICETREE="<devicetree1> <devicetree2>" all
+    $ make -f $PWD/../Makefile.sdk DEVICE_TREE="<devicetree1> <devicetree2>" all
   - Compile for a specific U-Boot configuration:
-    $ make -f $PWD/../Makefile.sdk UBOOT_CONFIG=default UBOOT_DEFCONFIG=stm32mp15_defconfig UBOOT_BINARY=u-boot.dtb DEVICETREE=stm32mp157f-dk2 all
+    $ make -f $PWD/../Makefile.sdk UBOOT_CONFIG=default UBOOT_DEFCONFIG=stm32mp15_defconfig UBOOT_BINARY=u-boot.dtb DEVICE_TREE=stm32mp157f-dk2 all
 To compile U-Boot source code and overwrite the default FIP artifacts with built artifacts:
     $> rm -rf $FIP_DEPLOYDIR_ROOT/u-boot/*
     $> make -f $PWD/../Makefile.sdk DEPLOYDIR=$FIP_DEPLOYDIR_ROOT/u-boot all
