@@ -85,7 +85,7 @@ tee-\$(1)-\$(2)-\$(3):
 		O=\$(BLD_PATH)/\$(1)-\$(3) \\
 		CFG_EMBED_DTB_SOURCE_FILE=\$(3).dts \\
 		\`cat \$(BLD_PATH)/\$(1)-\$(3)/\$(3)-sysram.txt\` \\
-		\$(shell echo \$(2) | tr a-z A-Z)=y || exit 1;
+		\$(shell echo CFG_\$(2) | tr a-z A-Z)=y || exit 1;
 endef
 
 # deploy-<config>-<soc>-<dt>
