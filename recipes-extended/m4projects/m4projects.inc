@@ -70,11 +70,11 @@ do_compile() {
                 mkdir -p ${PROJECT_DIR}/out/${BUILD_CONFIG}
 
                 bbnote "Parsing M4 project to get file list and build flags for ${project}"
-                ${PYTHON} ${WORKDIR}/parse_project_config.py "${PROJECT_APP}" "${BUILD_CONFIG}" "${PROJECT_DIR}"
+                ${PYTHON} ${UNPACKDIR}/parse_project_config.py "${PROJECT_APP}" "${BUILD_CONFIG}" "${PROJECT_DIR}"
                 bbnote "Cleaning M4 project : ${project}"
-                oe_runmake -f ${WORKDIR}/Makefile.stm32 BIN_NAME=${BIN_NAME} PROJECT_DIR=${PROJECT_DIR} clean
+                oe_runmake -f ${UNPACKDIR}/Makefile.stm32 BIN_NAME=${BIN_NAME} PROJECT_DIR=${PROJECT_DIR} clean
                 bbnote "Building M4 project : ${project}"
-                oe_runmake -f ${WORKDIR}/Makefile.stm32 BIN_NAME=${BIN_NAME} PROJECT_DIR=${PROJECT_DIR} all
+                oe_runmake -f ${UNPACKDIR}/Makefile.stm32 BIN_NAME=${BIN_NAME} PROJECT_DIR=${PROJECT_DIR} all
             fi
         done
     done
@@ -114,9 +114,9 @@ do_install() {
             # Install systemd service
             install -d ${D}${sysconfdir}/init.d/
             install -d ${D}${base_sbindir}/
-            install -m 0755 ${WORKDIR}/st-m4firmware-load-default.sh ${D}${sysconfdir}/init.d/st-m4firmware-load-default.sh
-            install -m 0755 ${WORKDIR}/st-m4firmware-load-default.sh ${D}${base_sbindir}/st-m4firmware-load-default.sh
-            install -m 0755 ${WORKDIR}/shutdown-stm32mp1-m4.sh ${D}${base_sbindir}/shutdown-stm32mp1-m4.sh
+            install -m 0755 ${UNPACKDIR}/st-m4firmware-load-default.sh ${D}${sysconfdir}/init.d/st-m4firmware-load-default.sh
+            install -m 0755 ${UNPACKDIR}/st-m4firmware-load-default.sh ${D}${base_sbindir}/st-m4firmware-load-default.sh
+            install -m 0755 ${UNPACKDIR}/shutdown-stm32mp1-m4.sh ${D}${base_sbindir}/shutdown-stm32mp1-m4.sh
 
             sed -i -e "s:@default_fw@:${DEFAULT_COPRO_FIRMWARE}:" \
             ${D}${sysconfdir}/init.d/st-m4firmware-load-default.sh
@@ -133,8 +133,8 @@ do_install() {
         if ${@bb.utils.contains('DISTRO_FEATURES','systemd','true','false',d)}; then
             install -d ${D}${systemd_unitdir}/system
             install -d ${D}${systemd_unitdir}/system-shutdown
-            install -m 644 ${WORKDIR}/st-m4firmware-load.service ${D}/${systemd_unitdir}/system
-            install -m 755 ${WORKDIR}/shutdown-stm32mp1-m4.sh ${D}/${systemd_unitdir}/system-shutdown
+            install -m 644 ${UNPACKDIR}/st-m4firmware-load.service ${D}/${systemd_unitdir}/system
+            install -m 755 ${UNPACKDIR}/shutdown-stm32mp1-m4.sh ${D}/${systemd_unitdir}/system-shutdown
         fi
     fi
 }

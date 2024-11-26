@@ -11,10 +11,13 @@ SRC_URI = " \
     file://ubootefi.var \
 "
 
+S = "${WORKDIR}/sources"
+UNPACKDIR = "${S}"
+
 inherit kernel-arch
 
-UBOOT_EXTLINUX_BOOTSCR = "${WORKDIR}/boot.scr.cmd"
-UBOOT_EXTLINUX_BOOTSCR_IMG = "${WORKDIR}/boot.scr.uimg"
+UBOOT_EXTLINUX_BOOTSCR = "${UNPACKDIR}/boot.scr.cmd"
+UBOOT_EXTLINUX_BOOTSCR_IMG = "${UNPACKDIR}/boot.scr.uimg"
 
 PV = "5.0.0"
 
@@ -25,7 +28,7 @@ do_compile() {
 }
 do_install() {
     install -d ${D}/${UBOOT_EFI_INSTALL_DIR}
-    install -m 0644 ${WORKDIR}/ubootefi.var ${D}/${UBOOT_EFI_INSTALL_DIR}/
+    install -m 0644 ${UNPACKDIR}/ubootefi.var ${D}/${UBOOT_EFI_INSTALL_DIR}/
     install -m 0644 ${UBOOT_EXTLINUX_BOOTSCR_IMG} ${D}/${UBOOT_EFI_INSTALL_DIR}/
 }
 FILES:${PN} = "${UBOOT_EFI_INSTALL_DIR}"

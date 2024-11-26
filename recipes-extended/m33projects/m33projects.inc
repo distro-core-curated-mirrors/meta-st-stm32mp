@@ -168,7 +168,7 @@ do_install() {
                     bbwarn "The TFM firmware doesn't exist (file=$tfm_secure_binary_name)"
                 fi
                 #temporary: add firmware to permit to load the project at runtime
-                install -m 0755 ${WORKDIR}/fw_cortex_m33.sh ${D}${M33_OUTPUT_4USERFS}/${INSTALL_PROJ}/
+                install -m 0755 ${UNPACKDIR}/fw_cortex_m33.sh ${D}${M33_OUTPUT_4USERFS}/${INSTALL_PROJ}/
                 for ex in ${DEFAULT_COPRO_FIRMWARE}; do
                     if [ "${project}" = "${ex}" ]; then
                         board_project=$(echo ${project} | cut -d'/' -f1 | tr '[:upper:]' '[:lower:]')
@@ -209,7 +209,7 @@ do_install() {
                     install -m 0755 ${B}/Projects/${PROJ_DIR}/${BIN_NAME_NS}.elf ${D}${M33_OUTPUT_4USERFS}/${INSTALL_PROJ}/lib/firmware/
                 fi
                 # Install sh and README files if any for each example
-                install -m 0755 ${WORKDIR}/fw_cortex_m0.sh ${D}${M33_OUTPUT_4USERFS}/${INSTALL_PROJ}/
+                install -m 0755 ${UNPACKDIR}/fw_cortex_m0.sh ${D}${M33_OUTPUT_4USERFS}/${INSTALL_PROJ}/
             fi
         done
     done
@@ -220,9 +220,9 @@ do_install() {
             # Install systemd service
             install -d ${D}${sysconfdir}/init.d/
             install -d ${D}${base_sbindir}/
-            install -m 0755 ${WORKDIR}/st-m33firmware-load-default.sh ${D}${sysconfdir}/init.d/st-m33firmware-load-default.sh
-            install -m 0755 ${WORKDIR}/st-m33firmware-load-default.sh ${D}${base_sbindir}/st-m33firmware-load-default.sh
-            install -m 0755 ${WORKDIR}/shutdown-stm32mp2-m33.sh ${D}${base_sbindir}/shutdown-stm32mp2-m33.sh
+            install -m 0755 ${UNPACKDIR}/st-m33firmware-load-default.sh ${D}${sysconfdir}/init.d/st-m33firmware-load-default.sh
+            install -m 0755 ${UNPACKDIR}/st-m33firmware-load-default.sh ${D}${base_sbindir}/st-m33firmware-load-default.sh
+            install -m 0755 ${UNPACKDIR}/shutdown-stm32mp2-m33.sh ${D}${base_sbindir}/shutdown-stm32mp2-m33.sh
 
             sed -i -e "s:##BOARDS_LIST##:${M33_BOARDS_START_AT_STARTUP}:g" \
             ${D}${sysconfdir}/init.d/st-m33firmware-load-default.sh
@@ -239,8 +239,8 @@ do_install() {
         if ${@bb.utils.contains('DISTRO_FEATURES','systemd','true','false',d)}; then
             install -d ${D}${systemd_unitdir}/system
             install -d ${D}${systemd_unitdir}/system-shutdown
-            install -m 644 ${WORKDIR}/st-m33firmware-load.service ${D}/${systemd_unitdir}/system
-            install -m 755 ${WORKDIR}/shutdown-stm32mp2-m33.sh ${D}/${systemd_unitdir}/system-shutdown
+            install -m 644 ${UNPACKDIR}/st-m33firmware-load.service ${D}/${systemd_unitdir}/system
+            install -m 755 ${UNPACKDIR}/shutdown-stm32mp2-m33.sh ${D}/${systemd_unitdir}/system-shutdown
         fi
     fi
 }

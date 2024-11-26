@@ -9,18 +9,21 @@ SRC_URI = " \
     file://bluetooth-brcmfmac-sleep.service \
     "
 
+S = "${WORKDIR}/sources"
+UNPACKDIR = "${S}"
+
 inherit systemd
 SYSTEMD_PACKAGES += "${PN}"
 SYSTEMD_SERVICE:${PN} = "bluetooth-brcmfmac-sleep.service"
 
 do_install() {
     install -d ${D}${bindir}
-    install -m 0755  ${WORKDIR}/bluetooth_brcmfmac_driver.sh ${D}${bindir}/
+    install -m 0755  ${UNPACKDIR}/bluetooth_brcmfmac_driver.sh ${D}${bindir}/
 
     if ${@bb.utils.contains('DISTRO_FEATURES','systemd','true','false',d)}; then
         install -d ${D}${systemd_unitdir}/system/
 
-        install -m 0644 ${WORKDIR}/bluetooth-brcmfmac-sleep.service ${D}${systemd_unitdir}/system/
+        install -m 0644 ${UNPACKDIR}/bluetooth-brcmfmac-sleep.service ${D}${systemd_unitdir}/system/
     fi
 }
 

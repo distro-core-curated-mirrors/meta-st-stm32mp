@@ -5,6 +5,9 @@ LIC_FILES_CHKSUM = "file://${COREBASE}/meta/files/common-licenses/BSD-3-Clause;m
 
 SRC_URI = " file://st_copro_firmware_signature.sh"
 
+S = "${WORKDIR}/sources"
+UNPACKDIR = "${S}"
+
 BBCLASSEXTEND = " native nativesdk"
 
 do_configure[noexec] = "1"
@@ -12,6 +15,6 @@ do_compile[noexec] = "1"
 
 do_install() {
     mkdir -p ${D}${bindir}
-    install -m 755 ${WORKDIR}/st_copro_firmware_signature.sh ${D}${bindir}
+    install -m 755 ${UNPACKDIR}/st_copro_firmware_signature.sh ${D}${bindir}
 }
 RDEPENDS:${PN} += "bash"

@@ -17,7 +17,8 @@ SRC_URI = " \
     file://alsa-state-stm32mp.service \
     "
 
-S = "${WORKDIR}"
+S = "${WORKDIR}/sources"
+UNPACKDIR = "${S}"
 
 COMPATIBLE_MACHINE = "(stm32mpcommon)"
 RDEPENDS:${PN} = "alsa-state"
@@ -26,15 +27,15 @@ do_install() {
     # Enable systemd automatic selection
     if ${@bb.utils.contains('DISTRO_FEATURES','systemd','true','false',d)}; then
         install -d ${D}${bindir}
-        if [ -f ${WORKDIR}/system-generator-alsa-states ]; then
-            install -m 0755 ${WORKDIR}/system-generator-alsa-states ${D}${bindir}
+        if [ -f ${UNPACKDIR}/system-generator-alsa-states ]; then
+            install -m 0755 ${UNPACKDIR}/system-generator-alsa-states ${D}${bindir}
         fi
-        if [ -f ${WORKDIR}/system-generator-alsa-conf ]; then
-            install -m 0755 ${WORKDIR}/system-generator-alsa-conf ${D}${bindir}
+        if [ -f ${UNPACKDIR}/system-generator-alsa-conf ]; then
+            install -m 0755 ${UNPACKDIR}/system-generator-alsa-conf ${D}${bindir}
         fi
 
         install -d ${D}${systemd_unitdir}/system
-        install -m 644 ${WORKDIR}/alsa-state-stm32mp.service ${D}/${systemd_unitdir}/system
+        install -m 644 ${UNPACKDIR}/alsa-state-stm32mp.service ${D}/${systemd_unitdir}/system
 
     fi
 }

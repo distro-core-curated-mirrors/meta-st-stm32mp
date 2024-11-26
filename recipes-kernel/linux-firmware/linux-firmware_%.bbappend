@@ -10,7 +10,7 @@ SRCREV_FORMAT = "linux-firmware-murata"
 do_install:append:stm32mpcommon() {
    # ---- 43430-----
    # Install calibration file
-   install -m 0644 ${WORKDIR}/nvram-murata/cyfmac43430-sdio.1DX.txt ${D}${nonarch_base_libdir}/firmware/brcm/brcmfmac43430-sdio.txt
+   install -m 0644 ${UNPACKDIR}/nvram-murata/cyfmac43430-sdio.1DX.txt ${D}${nonarch_base_libdir}/firmware/brcm/brcmfmac43430-sdio.txt
    # disable Wakeup on WLAN
    sed -i "s/muxenab=\(.*\)$/#muxenab=\1/g" ${D}${nonarch_base_libdir}/firmware/brcm/brcmfmac43430-sdio.txt
    # Install calibration file (stm32mp15)
@@ -20,8 +20,8 @@ do_install:append:stm32mpcommon() {
    install -m 0644 ${D}${nonarch_base_libdir}/firmware/brcm/brcmfmac43430-sdio.txt ${D}${nonarch_base_libdir}/firmware/brcm/brcmfmac43430-sdio.st,stm32mp135f-dk.txt
 
    # Take newest murata firmware
-   install -m 0644 ${WORKDIR}/murata/cyfmac43430-sdio.bin ${D}${nonarch_base_libdir}/firmware/brcm/brcmfmac43430-sdio.bin
-   install -m 0644 ${WORKDIR}/murata/cyfmac43430-sdio.1DX.clm_blob ${D}${nonarch_base_libdir}/firmware/brcm/brcmfmac43430-sdio.clm_blob
+   install -m 0644 ${UNPACKDIR}/murata/cyfmac43430-sdio.bin ${D}${nonarch_base_libdir}/firmware/brcm/brcmfmac43430-sdio.bin
+   install -m 0644 ${UNPACKDIR}/murata/cyfmac43430-sdio.1DX.clm_blob ${D}${nonarch_base_libdir}/firmware/brcm/brcmfmac43430-sdio.clm_blob
 
    # Add symlinks for newest kernel compatibility
    cd ${D}${nonarch_base_libdir}/firmware/brcm/
@@ -31,7 +31,7 @@ do_install:append:stm32mpcommon() {
 
    # ---- 43439-----
    # Install calibration file
-   install -m 0644 ${WORKDIR}/nvram-murata/cyfmac43439-sdio.1YN.txt ${D}${nonarch_base_libdir}/firmware/brcm/brcmfmac43439-sdio.txt
+   install -m 0644 ${UNPACKDIR}/nvram-murata/cyfmac43439-sdio.1YN.txt ${D}${nonarch_base_libdir}/firmware/brcm/brcmfmac43439-sdio.txt
    # disable Wakeup on WLAN
    sed -i "s/muxenab=\(.*\)$/#muxenab=\1/g" ${D}${nonarch_base_libdir}/firmware/brcm/brcmfmac43439-sdio.txt
    # Install calibration file (stm32mp25)
@@ -39,8 +39,8 @@ do_install:append:stm32mpcommon() {
    install -m 0644 ${D}${nonarch_base_libdir}/firmware/brcm/brcmfmac43439-sdio.txt ${D}${nonarch_base_libdir}/firmware/brcm/brcmfmac43439-sdio.st,stm32mp235f-dk.txt
 
    # Take newest murata firmware
-   install -m 0644 ${WORKDIR}/murata/cyfmac43439-sdio.bin ${D}${nonarch_base_libdir}/firmware/brcm/brcmfmac43439-sdio.bin
-   install -m 0644 ${WORKDIR}/murata/cyfmac43439-sdio.1YN.clm_blob ${D}${nonarch_base_libdir}/firmware/brcm/brcmfmac43439-sdio.clm_blob
+   install -m 0644 ${UNPACKDIR}/murata/cyfmac43439-sdio.bin ${D}${nonarch_base_libdir}/firmware/brcm/brcmfmac43439-sdio.bin
+   install -m 0644 ${UNPACKDIR}/murata/cyfmac43439-sdio.1YN.clm_blob ${D}${nonarch_base_libdir}/firmware/brcm/brcmfmac43439-sdio.clm_blob
 
    # Add symlinks for newest kernel compatibility
    cd ${D}${nonarch_base_libdir}/firmware/brcm/
@@ -51,15 +51,15 @@ do_install:append:stm32mpcommon() {
 
    # ---- 4773 ----
    # Install calibration file
-   install -m 0644 ${WORKDIR}/nvram-murata/cyfmac4373-sdio.2AE.txt ${D}${nonarch_base_libdir}/firmware/brcm/brcmfmac4373-sdio.txt
+   install -m 0644 ${UNPACKDIR}/nvram-murata/cyfmac4373-sdio.2AE.txt ${D}${nonarch_base_libdir}/firmware/brcm/brcmfmac4373-sdio.txt
    # disable Wakeup on WLAN
    sed -i "s/muxenab=\(.*\)$/#muxenab=\1/g" ${D}${nonarch_base_libdir}/firmware/brcm/brcmfmac4373-sdio.txt
    # Install calibration file (stm32mp25)
    install -m 0644 ${D}${nonarch_base_libdir}/firmware/brcm/brcmfmac4373-sdio.txt ${D}${nonarch_base_libdir}/firmware/brcm/brcmfmac4373-sdio.st,stm32mp215f-dk.txt
 
    # Take newest murata firmware
-   install -m 0644 ${WORKDIR}/murata/cyfmac4373-sdio.2AE.bin ${D}${nonarch_base_libdir}/firmware/brcm/brcmfmac4373-sdio.bin
-   install -m 0644 ${WORKDIR}/murata/cyfmac4373-sdio.2AE.clm_blob ${D}${nonarch_base_libdir}/firmware/brcm/brcmfmac4373-sdio.clm_blob
+   install -m 0644 ${UNPACKDIR}/murata/cyfmac4373-sdio.2AE.bin ${D}${nonarch_base_libdir}/firmware/brcm/brcmfmac4373-sdio.bin
+   install -m 0644 ${UNPACKDIR}/murata/cyfmac4373-sdio.2AE.clm_blob ${D}${nonarch_base_libdir}/firmware/brcm/brcmfmac4373-sdio.clm_blob
 
    # Add symlinks for newest kernel compatibility
    cd ${D}${nonarch_base_libdir}/firmware/brcm/

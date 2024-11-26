@@ -63,7 +63,7 @@ do_configure:append() {
         if [ ! -z ${KERNEL_EXTERNAL_DEFCONFIG} ];
         then
             bbnote "Kernel customized: configuration of linux STM by using external DEFCONFIG"
-            install -m 0644 ${WORKDIR}/${KERNEL_EXTERNAL_DEFCONFIG} ${B}/.config
+            install -m 0644 ${UNPACKDIR}/${KERNEL_EXTERNAL_DEFCONFIG} ${B}/.config
             yes '' | oe_runmake -C ${S} O=${B} CC="${KERNEL_CC}" LD="${KERNEL_LD}" oldconfig
         else
             bbwarn "You must specify KERNEL_DEFCONFIG or KERNEL_EXTERNAL_DEFCONFIG"
@@ -76,7 +76,7 @@ do_configure:append() {
         for f in ${KERNEL_CONFIG_FRAGMENTS}
         do
             bbnote "file = $f"
-            # Check if the config fragment was copied into the WORKDIR from
+            # Check if the config fragment was copied into the UNPACKDIR from
             # the OE meta data
             if [ ! -e "$f" ]
             then
@@ -91,7 +91,7 @@ do_configure:append() {
     fi
 
     yes '' | oe_runmake -C ${S} O=${B} CC="${KERNEL_CC}" LD="${KERNEL_LD}" oldconfig
-    #oe_runmake -C ${S} O=${B} savedefconfig && cp ${B}/defconfig ${WORKDIR}/defconfig.saved
+    #oe_runmake -C ${S} O=${B} savedefconfig && cp ${B}/defconfig ${UNPACKDIR}/defconfig.saved
 }
 
 # ---------------------------------------------------------------------
@@ -114,6 +114,7 @@ correct_buildpaths() {
     ${B}/drivers/video/logo/logo_linux_clut224.c \
     ${B}/drivers/tty/vt/consolemap_deftbl.c \
     ${B}/lib/oid_registry_data.c \
+    ${B}/arch/arm/include/generated/asm/mach-types.h \
     "
     for f in $FILES; do
         if [ -e $f ]; then

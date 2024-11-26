@@ -5,6 +5,9 @@ LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda
 
 SRC_URI:append:class-nativesdk = " file://environment.d-optee-sdk.sh"
 
+S = "${WORKDIR}/sources"
+UNPACKDIR = "${S}"
+
 BBCLASSEXTEND = " nativesdk"
 
 do_configure[noexec] = "1"
@@ -12,7 +15,7 @@ do_compile[noexec] = "1"
 
 do_install:append:class-nativesdk () {
     mkdir -p ${D}${SDKPATHNATIVE}/environment-setup.d
-    install -m 755 ${WORKDIR}/environment.d-optee-sdk.sh ${D}${SDKPATHNATIVE}/environment-setup.d/optee-sdk.sh
+    install -m 755 ${UNPACKDIR}/environment.d-optee-sdk.sh ${D}${SDKPATHNATIVE}/environment-setup.d/optee-sdk.sh
 }
 
 FILES:${PN}:append:class-nativesdk = " ${SDKPATHNATIVE}/environment-setup.d/optee-sdk.sh"

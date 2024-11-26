@@ -46,7 +46,7 @@ do_install() {
         ${B}/tools/encrypt_fw/encrypt_fw \
         ${D}${bindir}
 
-    install -m 0755 ${WORKDIR}/create_st_fip_binary.sh ${D}${bindir}
+    install -m 0755 ${UNPACKDIR}/create_st_fip_binary.sh ${D}${bindir}
 }
 
 BBCLASSEXTEND += "native nativesdk"
