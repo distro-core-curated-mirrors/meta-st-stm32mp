@@ -5,6 +5,8 @@ Subject: [PATCH] FIX GCC tools overwrite
 
 Signed-off-by: Christophe Priouzeau <christophe.priouzeau@foss.st.com>
 ---
+Upstream-Status: Pending [specific to ST boards]
+
  Makefile | 22 +++++++++++-----------
  1 file changed, 11 insertions(+), 11 deletions(-)
 

@@ -5,6 +5,8 @@ Subject: [PATCH 2/2] Modify-Reset-reason-trace-level
 
 Signed-off-by: Christophe Priouzeau <christophe.priouzeau@foss.st.com>
 ---
+Upstream-Status: Inappropriate [specific to ST boards]
+
  plat/st/stm32mp1/bl2_plat_setup.c | 2 +-
  plat/st/stm32mp2/bl2_plat_setup.c | 2 +-
  2 files changed, 2 insertions(+), 2 deletions(-)

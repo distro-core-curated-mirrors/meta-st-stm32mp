@@ -9,6 +9,8 @@ tf-m-tests/app/main_ns.c:155:29: error: storage size of 'cpu_info' isn't known
 Signed-off-by: Ludovic Barre <ludovic.barre@foss.st.com>
 Change-Id: Id89654ed3c60474eee3fc3fb77cc359ffbec3008
 ---
+Upstream-Status: Pending [specific to ST boards]
+
  app/main_ns.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 

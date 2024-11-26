@@ -10,6 +10,8 @@ Signed-off-by: Ludovic Barre <ludovic.barre@foss.st.com>
 Change-Id: I3f447443a6fc867de081c6b45843fa6d6f2445df
 Reviewed-on: https://gerrit.st.com/c/mpu/oe/st/TF-M/tf-m-tests/+/405547
 ---
+Upstream-Status: Pending [specific to ST boards]
+
  app/CMakeLists.txt |  1 +
  app/main_ns.c      | 56 ++++++++++++++++++++++++++++++++++++++++++++++
  2 files changed, 57 insertions(+)

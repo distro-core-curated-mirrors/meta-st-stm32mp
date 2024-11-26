@@ -5,6 +5,8 @@ Subject: [PATCH] silent_mode
 
 Signed-off-by: Christophe Priouzeau <christophe.priouzeau@foss.st.com>
 ---
+Upstream-Status: Inappropriate [specific to ST boards]
+
  include/configs/stm32mp13_st_common.h | 1 +
  include/configs/stm32mp15_st_common.h | 1 +
  include/configs/stm32mp21_st_common.h | 1 +

@@ -5,6 +5,8 @@ Subject: [PATCH 2/2] Add external var to allow build of new devicetree file
 
 Signed-off-by: Romuald JEANNE <romuald.jeanne@st.com>
 ---
+Upstream-Status: Inappropriate [specific to ST boards]
+
  arch/arm/dts/Makefile | 6 ++++++
  1 file changed, 6 insertions(+)
 

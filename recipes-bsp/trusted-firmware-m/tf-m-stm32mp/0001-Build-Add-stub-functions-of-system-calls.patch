@@ -10,6 +10,8 @@ system calls to solve this issue.
 
 Signed-off-by: Chendi Sun <chendi.sun@arm.com>
 ---
+Upstream-Status: Backport
+
  app/CMakeLists.txt | 2 ++
  1 file changed, 2 insertions(+)
 

@@ -4,6 +4,8 @@ Date: Fri, 12 Jul 2024 16:09:54 +0200
 Subject: [PATCH] v2.10-stm32mp-r1
 
 ---
+Upstream-Status: Pending [specific to ST boards]
+
  CODE_OF_CONDUCT.md                            |   73 +
  CONTRIBUTING.md                               |   30 +
  Makefile                                      |   25 +-

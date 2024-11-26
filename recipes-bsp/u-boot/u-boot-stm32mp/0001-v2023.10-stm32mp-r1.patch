@@ -4,6 +4,8 @@ Date: Fri, 12 Jul 2024 14:28:46 +0200
 Subject: [PATCH] v2023.10-stm32mp-r1
 
 ---
+Upstream-Status: Pending [specific to ST boards]
+
  .gitignore                                    |    3 +
  CODE_OF_CONDUCT.md                            |   73 +
  CONTRIBUTING.md                               |   30 +

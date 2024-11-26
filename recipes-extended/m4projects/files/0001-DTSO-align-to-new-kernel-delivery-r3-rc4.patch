@@ -8,6 +8,8 @@ DTBO: align to new kernel stm32mp157c-m4-srm.dtsi
 so
 DTBO: disable DMA at the end
 ---
+Upstream-Status: Pending [specific to ST boards]
+
  .../stm32mp157-dk/M4ResourcesForAllExamples.dtso   | 204 +++++++++---------
  .../stm32mp157-ev/M4ResourcesForAllExamples.dtso   | 239 +++++++++++----------
  2 files changed, 234 insertions(+), 209 deletions(-)

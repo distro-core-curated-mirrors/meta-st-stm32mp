@@ -5,7 +5,6 @@ Subject: [PATCH 2/2] conf: add card config for stm32mp13x_evd board
 
 Add card configuration file for STM32MP13x-EVD board.
 
-Upstream-Status: Pending [specific to ST boards]
 Signed-off-by: Olivier Moysan <olivier.moysan@st.com>
 ---
 Upstream-Status: Pending [specific to ST boards]
