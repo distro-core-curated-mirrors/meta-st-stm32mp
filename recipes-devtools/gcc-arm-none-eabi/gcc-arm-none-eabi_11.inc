@@ -21,6 +21,9 @@ do_install() {
 }
 
 INSANE_SKIP:${PN} = "already-stripped file-rdeps"
+INSANE_SKIP:${PN} += "arch libdir"
+INSANE_SKIP:${PN}-dbg += "libdir"
+
 INHIBIT_PACKAGE_STRIP = "1"
 INHIBIT_SYSROOT_STRIP = "1"
 # Avoid QA Issue: contains reference to TMPDIR [buildpaths]
