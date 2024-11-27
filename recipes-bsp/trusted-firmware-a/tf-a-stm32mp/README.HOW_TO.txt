@@ -109,6 +109,8 @@ To use the STM32MP DDR firmware, FWDDR_DIR variable must be set to the root loca
 as specified in the README.HOW_TO.txt of stm32mp-ddr-phy
     $> export FWDDR_DIR=<stm32mp ddr firmware location>
 
+NOTE: In case "All" target is present on the build command line it is required to have external DT component source code present, otherwise have to specify the DT(s) to build.
+
 The build results for this component are available in DEPLOYDIR (Default: $PWD/../deploy).
 If needed, this deploy directory can be specified by adding "DEPLOYDIR=<your_deploy_dir_path>" compilation option to the build command line below.
 The generated FIP images are available in <FIP_DEPLOYDIR_ROOT>/fip

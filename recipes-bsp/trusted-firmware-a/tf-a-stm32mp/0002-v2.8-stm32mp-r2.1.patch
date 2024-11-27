@@ -1,0 +1,374 @@
+From fe656d70cdff0e5605246d097e6e4c0008f3338b Mon Sep 17 00:00:00 2001
+From: vermaash <ashish.verma@st.com>
+Date: Tue, 26 Nov 2024 10:24:16 +0530
+Subject: [PATCH] v2.8-stm32mp-r2.1
+
+Signed-off-by: vermaash <ashish.verma@st.com>
+---
+ drivers/st/ddr/stm32mp1_ddr_helpers.c         | 47 ++++++++++---------
+ drivers/st/ddr/stm32mp1_ram.c                 |  3 +-
+ ...p25-lpddr4-1x32Gbits-1x32bits-1200MHz.dtsi |  2 +-
+ fdts/stm32mp25-pinctrl.dtsi                   | 26 ++++++++--
+ fdts/stm32mp257f-dk.dts                       |  2 +-
+ include/drivers/st/stm32mp1_ddr_helpers.h     |  2 +-
+ include/dt-bindings/clock/stm32mp25-clksrc.h  | 10 ++--
+ plat/st/common/common.mk                      |  2 +-
+ plat/st/stm32mp1/bl2_plat_setup.c             |  2 +-
+ plat/st/stm32mp1/stm32mp1_ssp.mk              |  2 +-
+ plat/st/stm32mp2/bl2_plat_setup.c             |  2 +-
+ plat/st/stm32mp2/stm32mp2_def.h               |  6 +--
+ plat/st/stm32mp2/stm32mp2_pm.c                |  8 +---
+ plat/st/stm32mp2/stm32mp2_private.c           |  6 +--
+ 14 files changed, 71 insertions(+), 49 deletions(-)
+
+diff --git a/drivers/st/ddr/stm32mp1_ddr_helpers.c b/drivers/st/ddr/stm32mp1_ddr_helpers.c
+index 5adf38f0fc..bf09d8cb53 100644
+--- a/drivers/st/ddr/stm32mp1_ddr_helpers.c
++++ b/drivers/st/ddr/stm32mp1_ddr_helpers.c
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2017-2022, STMicroelectronics - All Rights Reserved
++ * Copyright (c) 2017-2024, STMicroelectronics - All Rights Reserved
+  *
+  * SPDX-License-Identifier: BSD-3-Clause
+  */
+@@ -16,19 +16,21 @@
+ 
+ #include <platform_def.h>
+ 
+-void ddr_enable_clock(void)
++void ddr_enable_clock(bool ddrphycen)
+ {
+-	stm32mp1_clk_rcc_regs_lock();
++	uint32_t rcc_ddritfcr = RCC_DDRITFCR_DDRC1EN | RCC_DDRITFCR_DDRPHYCAPBEN |
++				RCC_DDRITFCR_DDRCAPBEN;
+ 
+-	mmio_setbits_32(stm32mp_rcc_base() + RCC_DDRITFCR,
+-			RCC_DDRITFCR_DDRC1EN |
+ #if STM32MP_DDR_DUAL_AXI_PORT
+-			RCC_DDRITFCR_DDRC2EN |
++	rcc_ddritfcr |= RCC_DDRITFCR_DDRC2EN;
+ #endif
+-			RCC_DDRITFCR_DDRPHYCEN |
+-			RCC_DDRITFCR_DDRPHYCAPBEN |
+-			RCC_DDRITFCR_DDRCAPBEN);
+ 
++	if (ddrphycen) {
++		rcc_ddritfcr |= RCC_DDRITFCR_DDRPHYCEN;
++	}
++
++	stm32mp1_clk_rcc_regs_lock();
++	mmio_setbits_32(stm32mp_rcc_base() + RCC_DDRITFCR, rcc_ddritfcr);
+ 	stm32mp1_clk_rcc_regs_unlock();
+ }
+ 
+@@ -103,9 +105,14 @@ static int ddr_sw_self_refresh_in(void)
+ 	mmio_setbits_32(pwr_base + PWR_CR3, PWR_CR3_DDRRETEN);
+ 	stm32mp_pwr_regs_unlock();
+ 
+-	/* Switch controller clocks (uMCTL2/PUBL) to DLL ref clock */
+ 	stm32mp1_clk_rcc_regs_lock();
++
++	/* Switch controller clocks (uMCTL2/PUBL) to DLL ref clock */
+ 	mmio_setbits_32(rcc_base + RCC_DDRITFCR, RCC_DDRITFCR_GSKPCTRL);
++
++	/* Deactivate DDRPHY clock */
++	mmio_clrbits_32(rcc_base + RCC_DDRITFCR, RCC_DDRITFCR_DDRPHYCEN);
++
+ 	stm32mp1_clk_rcc_regs_unlock();
+ 
+ 	/* Disable all DLLs: GLITCH window */
+@@ -128,10 +135,7 @@ static int ddr_sw_self_refresh_in(void)
+ 
+ 	stm32mp1_clk_rcc_regs_lock();
+ 
+-	/* Switch controller clocks (uMCTL2/PUBL) to DLL output clock */
+-	mmio_clrbits_32(rcc_base + RCC_DDRITFCR, RCC_DDRITFCR_GSKPCTRL);
+-
+-	/* Deactivate all DDR clocks */
++	/* Deactivate all other DDR clocks */
+ 	mmio_clrbits_32(rcc_base + RCC_DDRITFCR,
+ 			RCC_DDRITFCR_DDRC1EN |
+ #if STM32MP_DDR_DUAL_AXI_PORT
+@@ -162,8 +166,8 @@ int ddr_sw_self_refresh_exit(void)
+ 	uintptr_t ddrctrl_base = stm32mp_ddrctrl_base();
+ 	uintptr_t ddrphyc_base = stm32mp_ddrphyc_base();
+ 
+-	/* Enable all clocks */
+-	ddr_enable_clock();
++	/* Enable clocks except DDRPHY */
++	ddr_enable_clock(false);
+ 
+ 	/*
+ 	 * Manage quasi-dynamic registers modification
+@@ -177,11 +181,6 @@ int ddr_sw_self_refresh_exit(void)
+ 
+ 	stm32mp_ddr_unset_qd3_update_conditions((struct stm32mp_ddrctl *)ddrctrl_base);
+ 
+-	/* Switch controller clocks (uMCTL2/PUBL) to DLL ref clock */
+-	stm32mp1_clk_rcc_regs_lock();
+-	mmio_setbits_32(rcc_base + RCC_DDRITFCR, RCC_DDRITFCR_GSKPCTRL);
+-	stm32mp1_clk_rcc_regs_unlock();
+-
+ 	/* Enable all DLLs: GLITCH window */
+ 	mmio_clrbits_32(ddrphyc_base + DDRPHYC_ACDLLCR,
+ 			DDRPHYC_ACDLLCR_DLLDIS);
+@@ -213,6 +212,12 @@ int ddr_sw_self_refresh_exit(void)
+ 
+ 	udelay(DDR_DELAY_10US);
+ 
++	/* Enable DDRPHY clock */
++	stm32mp1_clk_rcc_regs_lock();
++	mmio_setbits_32(stm32mp_rcc_base() + RCC_DDRITFCR, RCC_DDRITFCR_DDRPHYCEN);
++	stm32mp1_clk_rcc_regs_unlock();
++
++	/* Release reset */
+ 	mmio_setbits_32(ddrphyc_base + DDRPHYC_ACDLLCR,
+ 			DDRPHYC_ACDLLCR_DLLSRST);
+ 
+diff --git a/drivers/st/ddr/stm32mp1_ram.c b/drivers/st/ddr/stm32mp1_ram.c
+index c04f55f7d3..3e95712176 100644
+--- a/drivers/st/ddr/stm32mp1_ram.c
++++ b/drivers/st/ddr/stm32mp1_ram.c
+@@ -28,7 +28,8 @@ int stm32mp1_ddr_clk_enable(struct stm32mp_ddr_priv *priv, uint32_t mem_speed)
+ {
+ 	unsigned long ddrphy_clk, ddr_clk, mem_speed_hz;
+ 
+-	ddr_enable_clock();
++	/* Enable all clocks, including DDRPHY */
++	ddr_enable_clock(true);
+ 
+ 	ddrphy_clk = clk_get_rate(DDRPHYC);
+ 
+diff --git a/fdts/stm32mp25-lpddr4-1x32Gbits-1x32bits-1200MHz.dtsi b/fdts/stm32mp25-lpddr4-1x32Gbits-1x32bits-1200MHz.dtsi
+index 62901d5b7b..1e8b181e13 100644
+--- a/fdts/stm32mp25-lpddr4-1x32Gbits-1x32bits-1200MHz.dtsi
++++ b/fdts/stm32mp25-lpddr4-1x32Gbits-1x32bits-1200MHz.dtsi
+@@ -161,7 +161,7 @@
+ #define DDR_UIA_DISDYNADRTRI_0 0x00000001
+ #define DDR_UIA_PHYMSTRTRAININTERVAL_0 0x0000000A
+ #define DDR_UIA_PHYMSTRMAXREQTOACK_0 0x00000005
+-#define DDR_UIA_WDQSEXT 0x00000000
++#define DDR_UIA_WDQSEXT 0x00000001
+ #define DDR_UIA_CALINTERVAL 0x00000009
+ #define DDR_UIA_CALONCE 0x00000000
+ #define DDR_UIA_LP4RL_0 0x00000004
+diff --git a/fdts/stm32mp25-pinctrl.dtsi b/fdts/stm32mp25-pinctrl.dtsi
+index bd4bd8870d..cbadd20890 100644
+--- a/fdts/stm32mp25-pinctrl.dtsi
++++ b/fdts/stm32mp25-pinctrl.dtsi
+@@ -65,6 +65,26 @@
+ 		};
+ 	};
+ 
++	/omit-if-no-ref/
++	sdmmc1_b4_pins_b: sdmmc1-b4-1 {
++		pins1 {
++			pinmux = <STM32_PINMUX('E', 4, AF10)>, /* SDMMC1_D0 */
++				 <STM32_PINMUX('E', 5, AF10)>, /* SDMMC1_D1 */
++				 <STM32_PINMUX('E', 0, AF10)>, /* SDMMC1_D2 */
++				 <STM32_PINMUX('E', 1, AF10)>, /* SDMMC1_D3 */
++				 <STM32_PINMUX('E', 2, AF10)>; /* SDMMC1_CMD */
++			slew-rate = <1>;
++			drive-push-pull;
++			bias-disable;
++		};
++		pins2 {
++			pinmux = <STM32_PINMUX('E', 3, AF10)>; /* SDMMC1_CK */
++			slew-rate = <2>;
++			drive-push-pull;
++			bias-disable;
++		};
++	};
++
+ 	sdmmc2_b4_pins_a: sdmmc2-b4-0 {
+ 		pins1 {
+ 			pinmux = <STM32_PINMUX('E', 13, AF12)>, /* SDMMC2_D0 */
+@@ -72,13 +92,13 @@
+ 				 <STM32_PINMUX('E', 8, AF12)>, /* SDMMC2_D2 */
+ 				 <STM32_PINMUX('E', 12, AF12)>, /* SDMMC2_D3 */
+ 				 <STM32_PINMUX('E', 15, AF12)>; /* SDMMC2_CMD */
+-			slew-rate = <2>;
++			slew-rate = <1>;
+ 			drive-push-pull;
+ 			bias-pull-up;
+ 		};
+ 		pins2 {
+ 			pinmux = <STM32_PINMUX('E', 14, AF12)>; /* SDMMC2_CK */
+-			slew-rate = <3>;
++			slew-rate = <2>;
+ 			drive-push-pull;
+ 			bias-pull-up;
+ 		};
+@@ -90,7 +110,7 @@
+ 				 <STM32_PINMUX('E', 9, AF12)>, /* SDMMC2_D5 */
+ 				 <STM32_PINMUX('E', 6, AF12)>, /* SDMMC2_D6 */
+ 				 <STM32_PINMUX('E', 7, AF12)>; /* SDMMC2_D7 */
+-			slew-rate = <2>;
++			slew-rate = <1>;
+ 			drive-push-pull;
+ 			bias-pull-up;
+ 		};
+diff --git a/fdts/stm32mp257f-dk.dts b/fdts/stm32mp257f-dk.dts
+index 853674ebe9..5eaa457b3b 100644
+--- a/fdts/stm32mp257f-dk.dts
++++ b/fdts/stm32mp257f-dk.dts
+@@ -199,7 +199,7 @@
+ 
+ &sdmmc1 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&sdmmc1_b4_pins_a>;
++	pinctrl-0 = <&sdmmc1_b4_pins_b>;
+ 	st,neg-edge;
+ 	bus-width = <4>;
+ 	vmmc-supply = <&vdd_sdcard>;
+diff --git a/include/drivers/st/stm32mp1_ddr_helpers.h b/include/drivers/st/stm32mp1_ddr_helpers.h
+index f8c586958a..0f44453b52 100644
+--- a/include/drivers/st/stm32mp1_ddr_helpers.h
++++ b/include/drivers/st/stm32mp1_ddr_helpers.h
+@@ -16,7 +16,7 @@ enum stm32mp1_ddr_sr_mode {
+ 	DDR_ASR_MODE,
+ };
+ 
+-void ddr_enable_clock(void);
++void ddr_enable_clock(bool ddrphycen);
+ int ddr_sw_self_refresh_exit(void);
+ uint32_t ddr_get_io_calibration_val(void);
+ int ddr_standby_sr_entry(void);
+diff --git a/include/dt-bindings/clock/stm32mp25-clksrc.h b/include/dt-bindings/clock/stm32mp25-clksrc.h
+index ee22cc55ab..53339b4bfd 100644
+--- a/include/dt-bindings/clock/stm32mp25-clksrc.h
++++ b/include/dt-bindings/clock/stm32mp25-clksrc.h
+@@ -56,14 +56,14 @@
+ #define CLK_NOMUX	0x00000010
+ 
+ /* Flexgen define */
+-#define FLEX_ID_SHIFT	13
+-#define FLEX_SEL_SHIFT	9
++#define FLEX_ID_SHIFT	20
++#define FLEX_SEL_SHIFT	16
+ #define FLEX_PDIV_SHIFT	6
+ #define FLEX_FDIV_SHIFT	0
+ 
+-#define FLEX_ID_MASK	GENMASK_32(18, 13)
+-#define FLEX_SEL_MASK	GENMASK_32(12, 9)
+-#define FLEX_PDIV_MASK	GENMASK_32(8, 6)
++#define FLEX_ID_MASK	GENMASK_32(25, 20)
++#define FLEX_SEL_MASK	GENMASK_32(19, 16)
++#define FLEX_PDIV_MASK	GENMASK_32(15, 6)
+ #define FLEX_FDIV_MASK	GENMASK_32(5, 0)
+ 
+ #define DIV_CFG(div_id, div)	((CMD_DIV << CMD_SHIFT) |\
+diff --git a/plat/st/common/common.mk b/plat/st/common/common.mk
+index 13cdcd70bb..2c446e2701 100644
+--- a/plat/st/common/common.mk
++++ b/plat/st/common/common.mk
+@@ -11,7 +11,7 @@ STM32MP_RECONFIGURE_CONSOLE ?=	0
+ STM32MP_UART_BAUDRATE	?=	115200
+ 
+ # Add specific ST version
+-ST_VERSION 		:=	r2.0
++ST_VERSION 		:=	r2.1
+ ST_GIT_SHA1		:=	$(shell git rev-parse --short=8 HEAD 2>/dev/null)
+ VERSION_STRING		:=	v${VERSION_MAJOR}.${VERSION_MINOR}-${PLAT}-${ST_VERSION}(${BUILD_TYPE}):${BUILD_STRING}(${ST_GIT_SHA1})
+ 
+diff --git a/plat/st/stm32mp1/bl2_plat_setup.c b/plat/st/stm32mp1/bl2_plat_setup.c
+index 6752194bb8..395c916ac0 100644
+--- a/plat/st/stm32mp1/bl2_plat_setup.c
++++ b/plat/st/stm32mp1/bl2_plat_setup.c
+@@ -334,7 +334,7 @@ static void check_tamper_event(bool lse_tamper_occured)
+ 			cr2 = mmio_read_32(TAMP_BASE + TAMP_CR2);
+ 			cr3 = mmio_read_32(TAMP_BASE + TAMP_CR3);
+ 
+-			if ((is_internal && ((cr3 & BIT_32(bit_off >> TAMP_SR_INT_SHIFT)) != 0U)) ||
++			if ((is_internal && ((cr3 & BIT_32(bit_off - TAMP_SR_INT_SHIFT)) != 0U)) ||
+ 			    (!is_internal && ((cr2 & BIT_32(bit_off)) != 0U))) {
+ 				handle_potential_tamper(bit_off);
+ 			} else {
+diff --git a/plat/st/stm32mp1/stm32mp1_ssp.mk b/plat/st/stm32mp1/stm32mp1_ssp.mk
+index 7d65b752fd..c4623892b3 100644
+--- a/plat/st/stm32mp1/stm32mp1_ssp.mk
++++ b/plat/st/stm32mp1/stm32mp1_ssp.mk
+@@ -4,7 +4,7 @@
+ # SPDX-License-Identifier: BSD-3-Clause
+ #
+ 
+-ST_VERSION 		:=	r1.0-ssp
++ST_VERSION 		:=	r2.1-ssp
+ VERSION_STRING		:=	v${VERSION_MAJOR}.${VERSION_MINOR}-${PLAT}-${ST_VERSION}(${BUILD_TYPE}):${BUILD_STRING}
+ 
+ # Required to use BL2_IN_XIP_MEM
+diff --git a/plat/st/stm32mp2/bl2_plat_setup.c b/plat/st/stm32mp2/bl2_plat_setup.c
+index a05d63b5d0..f3287fa02c 100644
+--- a/plat/st/stm32mp2/bl2_plat_setup.c
++++ b/plat/st/stm32mp2/bl2_plat_setup.c
+@@ -315,7 +315,7 @@ static void check_tamper_event(bool lse_tamper_occured)
+ 			      is_internal ? "INTERNAL" : "EXTERNAL",
+ 			      is_internal ? (bit_off - TAMP_SR_INT_SHIFT + 1U) : (bit_off + 1U));
+ 
+-			if ((is_internal && ((cr3 & BIT_32(bit_off >> TAMP_SR_INT_SHIFT)) != 0U)) ||
++			if ((is_internal && ((cr3 & BIT_32(bit_off - TAMP_SR_INT_SHIFT)) != 0U)) ||
+ 			    (!is_internal && ((cr2 & BIT_32(bit_off)) != 0U))) {
+ 				handle_potential_tamper(bit_off);
+ 			} else {
+diff --git a/plat/st/stm32mp2/stm32mp2_def.h b/plat/st/stm32mp2/stm32mp2_def.h
+index 001b26abba..ea20f02999 100644
+--- a/plat/st/stm32mp2/stm32mp2_def.h
++++ b/plat/st/stm32mp2/stm32mp2_def.h
+@@ -58,9 +58,9 @@
+  * PACKAGE ID
+  ******************************************************************************/
+ #define STM32MP25_PKG_CUSTOM		U(0)
+-#define STM32MP25_PKG_AL_TBGA361	U(3)
+-#define STM32MP25_PKG_AK_TBGA424	U(4)
+-#define STM32MP25_PKG_AI_TBGA436	U(5)
++#define STM32MP25_PKG_AL_VFBGA361	U(1)
++#define STM32MP25_PKG_AK_VFBGA424	U(3)
++#define STM32MP25_PKG_AI_TFBGA436	U(5)
+ #define STM32MP25_PKG_UNKNOWN		U(7)
+ 
+ /*******************************************************************************
+diff --git a/plat/st/stm32mp2/stm32mp2_pm.c b/plat/st/stm32mp2/stm32mp2_pm.c
+index 59741da1c2..f8a1d0ddfc 100644
+--- a/plat/st/stm32mp2/stm32mp2_pm.c
++++ b/plat/st/stm32mp2/stm32mp2_pm.c
+@@ -629,13 +629,9 @@ static void __dead2 stm32_pwr_domain_pwr_down_wfi(const psci_power_state_t
+ 		stm32_pm_context_save(target_state);
+ 	}
+ 
+-	/*
+-	 * Synchronize on memory accesses and instruction flow before
+-	 * auto-reset from the WFI instruction.
+-	 */
+-	dsb();
++	/* Synchronize instruction flow before auto-reset from WFI */
+ 	isb();
+-	wfi();
++	psci_power_down_wfi();
+ 
+ 	/* This shouldn't be reached */
+ 	panic();
+diff --git a/plat/st/stm32mp2/stm32mp2_private.c b/plat/st/stm32mp2/stm32mp2_private.c
+index ca894a997c..c17ad33236 100644
+--- a/plat/st/stm32mp2/stm32mp2_private.c
++++ b/plat/st/stm32mp2/stm32mp2_private.c
+@@ -304,13 +304,13 @@ void stm32mp_get_soc_name(char name[STM32_SOC_NAME_SIZE])
+ 	case STM32MP25_PKG_CUSTOM:
+ 		pkg = "XX";
+ 		break;
+-	case STM32MP25_PKG_AL_TBGA361:
++	case STM32MP25_PKG_AL_VFBGA361:
+ 		pkg = "AL";
+ 		break;
+-	case STM32MP25_PKG_AK_TBGA424:
++	case STM32MP25_PKG_AK_VFBGA424:
+ 		pkg = "AK";
+ 		break;
+-	case STM32MP25_PKG_AI_TBGA436:
++	case STM32MP25_PKG_AI_TFBGA436:
+ 		pkg = "AI";
+ 		break;
+ 	default:
+-- 
+2.25.1
+

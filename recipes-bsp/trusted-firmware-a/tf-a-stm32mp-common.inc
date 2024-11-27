@@ -11,12 +11,13 @@ SRCREV = "567af710d8e1fa7b874f6643e4671555a60db123"
 
 SRC_URI += " \
     file://0001-v2.8-stm32mp-r2.patch \
+    file://0002-v2.8-stm32mp-r2.1.patch \
     "
 
 TF_A_VERSION = "v2.8"
 TF_A_SUBVERSION = ".15"
 TF_A_TARGET = "stm32mp"
-TF_A_RELEASE = "r2"
+TF_A_RELEASE = "r2.1"
 PV = "${TF_A_VERSION}${TF_A_SUBVERSION}-${TF_A_TARGET}-${TF_A_RELEASE}"
 
 ARCHIVER_ST_BRANCH = "${TF_A_VERSION}-${TF_A_TARGET}"
@@ -32,7 +33,7 @@ S = "${WORKDIR}/git"
 BBCLASSEXTEND = "devupstream:target"
 
 SRC_URI:class-devupstream = "git://github.com/STMicroelectronics/arm-trusted-firmware.git;protocol=https;branch=${ARCHIVER_ST_BRANCH}"
-SRCREV:class-devupstream = "1568486ae9e1c15c0add1bc80e6fe225fa90714a"
+SRCREV:class-devupstream = "c536182ad385c0a817f712d0084f02b71514a181"
 
 # ---------------------------------
 # Configure default preference to manage dynamic selection between tarball and github
