@@ -1,0 +1,714 @@
+From dc06b0182b4c087a09f3706b880b7a43be1a4b43 Mon Sep 17 00:00:00 2001
+From: vermaash <ashish.verma@st.com>
+Date: Mon, 25 Nov 2024 17:01:57 +0530
+Subject: [PATCH] Prepare OPTEE 3.19.0-stm32mp-r2.1
+
+Signed-off-by: vermaash <ashish.verma@st.com>
+---
+ .../arm/dts/stm32mp257f-dk-ca35tdcid-rcc.dtsi |   2 +-
+ .../dts/stm32mp257f-ev1-ca35tdcid-rcc.dtsi    |   2 +-
+ core/arch/arm/plat-stm32mp2/conf.mk           |   1 +
+ .../arm/plat-stm32mp2/scmi_server_scpfw.c     |   5 +-
+ core/drivers/clk/clk-stm32mp15.c              |  30 +---
+ core/drivers/firewall/stm32_rifsc.c           | 148 ++++++++++++++++++
+ core/drivers/firewall/stm32_risab.c           |  30 +++-
+ core/drivers/remoteproc/stm32_remoteproc.c    |  10 +-
+ core/drivers/stm32_bsec3.c                    |   9 +-
+ core/drivers/stm32_exti.c                     |   9 +-
+ core/drivers/stm32_hpdma.c                    |  28 +++-
+ core/include/drivers/stm32_rifsc.h            |   8 +
+ core/include/drivers/stm32_risab.h            |   6 +-
+ .../dt-bindings/clock/stm32mp25-clksrc.h      |  10 +-
+ .../product/optee-stm32mp2/fw/config_all.c    |  11 +-
+ core/lib/scmi-server/sub.mk                   |   6 +-
+ 16 files changed, 241 insertions(+), 74 deletions(-)
+
+diff --git a/core/arch/arm/dts/stm32mp257f-dk-ca35tdcid-rcc.dtsi b/core/arch/arm/dts/stm32mp257f-dk-ca35tdcid-rcc.dtsi
+index e6416ed9f8..48d2539831 100644
+--- a/core/arch/arm/dts/stm32mp257f-dk-ca35tdcid-rcc.dtsi
++++ b/core/arch/arm/dts/stm32mp257f-dk-ca35tdcid-rcc.dtsi
+@@ -116,7 +116,7 @@
+ 		MUX_CFG(MUX_LVDSPHY, MUX_LVDSPHY_FLEX32)
+ 		MUX_CFG(MUX_DTS, MUX_DTS_HSE)
+ 		MUX_CFG(MUX_RTC, MUX_RTC_LSE)
+-		MUX_CFG(MUX_D3PER, MUX_D3PER_LSE)
++		MUX_CFG(MUX_D3PER, MUX_D3PER_MSI)
+ 		MCO_CFG(MCO1, MUX_MCO1_FLEX61, MCO_OFF)
+ 		MCO_CFG(MCO2, MUX_MCO2_FLEX62, MCO_OFF)
+ 	>;
+diff --git a/core/arch/arm/dts/stm32mp257f-ev1-ca35tdcid-rcc.dtsi b/core/arch/arm/dts/stm32mp257f-ev1-ca35tdcid-rcc.dtsi
+index ff175ac82d..dc1eb6d6e1 100644
+--- a/core/arch/arm/dts/stm32mp257f-ev1-ca35tdcid-rcc.dtsi
++++ b/core/arch/arm/dts/stm32mp257f-ev1-ca35tdcid-rcc.dtsi
+@@ -116,7 +116,7 @@
+ 		MUX_CFG(MUX_LVDSPHY, MUX_LVDSPHY_FLEX32)
+ 		MUX_CFG(MUX_DTS, MUX_DTS_HSE)
+ 		MUX_CFG(MUX_RTC, MUX_RTC_LSE)
+-		MUX_CFG(MUX_D3PER, MUX_D3PER_LSE)
++		MUX_CFG(MUX_D3PER, MUX_D3PER_MSI)
+ 		MCO_CFG(MCO1, MUX_MCO1_FLEX61, MCO_OFF)
+ 		MCO_CFG(MCO2, MUX_MCO2_FLEX62, MCO_OFF)
+ 	>;
+diff --git a/core/arch/arm/plat-stm32mp2/conf.mk b/core/arch/arm/plat-stm32mp2/conf.mk
+index dfa3afd57c..f87b812c29 100644
+--- a/core/arch/arm/plat-stm32mp2/conf.mk
++++ b/core/arch/arm/plat-stm32mp2/conf.mk
+@@ -134,6 +134,7 @@ CFG_STM32_STGEN ?= y
+ CFG_STM32_TAMP ?= y
+ CFG_STM32_UART ?= y
+ CFG_STM32_VREFBUF ?= y
++CFG_WITH_TUI ?= y
+ 
+ # Default enable some test facitilites
+ CFG_ENABLE_EMBEDDED_TESTS ?= y
+diff --git a/core/arch/arm/plat-stm32mp2/scmi_server_scpfw.c b/core/arch/arm/plat-stm32mp2/scmi_server_scpfw.c
+index cd54c33073..a5549813bb 100644
+--- a/core/arch/arm/plat-stm32mp2/scmi_server_scpfw.c
++++ b/core/arch/arm/plat-stm32mp2/scmi_server_scpfw.c
+@@ -503,7 +503,8 @@ static TEE_Result scmi_scpfw_cfg_early_init(void)
+ 	/* There is 1 agent with 1 channel */
+ 
+ 	scpfw_cfg.agent_count = 1;
+-	scpfw_cfg.agent_config = calloc(1, sizeof(*scpfw_cfg.agent_config));
++	scpfw_cfg.agent_config = calloc(scpfw_cfg.agent_count,
++					sizeof(*scpfw_cfg.agent_config));
+ 
+ 	scpfw_cfg.agent_config[0].name = "agent";
+ 	scpfw_cfg.agent_config[0].agent_id = 1;
+@@ -528,7 +529,7 @@ static TEE_Result scmi_scpfw_cfg_init(void)
+ 
+ 	for (i = 0; i < ARRAY_SIZE(scmi_channel); i++) {
+ 		/* Clock and reset are exposed to agent#0/channel#0 */
+-		channel_cfg = scpfw_cfg.agent_config[i].channel_config;
++		channel_cfg = scpfw_cfg.agent_config[0].channel_config + i;
+ 		channel_cfg->name = "channel";
+ 
+ 		channel_cfg->clock_count = ARRAY_SIZE(stm32_scmi_clock);
+diff --git a/core/drivers/clk/clk-stm32mp15.c b/core/drivers/clk/clk-stm32mp15.c
+index 6fbc3b24fb..5c6372843e 100644
+--- a/core/drivers/clk/clk-stm32mp15.c
++++ b/core/drivers/clk/clk-stm32mp15.c
+@@ -3387,28 +3387,6 @@ static int clk_stm32_pll_init_switch_to_hsi_clk_system(int mux_sys)
+ 	return sel;
+ }
+ 
+-static uint32_t
+-clk_stm32_pll_backup_output_diven(const struct stm32_clk_pll *pll)
+-{
+-	struct clk_stm32_priv *priv = clk_stm32_get_priv();
+-	uintptr_t addr = priv->base + pll->reg_pllxcr;
+-
+-	return io_read32(addr + RCC_OFFSET_PLLXCR) &
+-			 (RCC_PLLNCR_DIVPEN | RCC_PLLNCR_DIVQEN |
+-			  RCC_PLLNCR_DIVREN);
+-}
+-
+-static void clk_stm32_pll_restore_output_diven(const struct stm32_clk_pll *pll,
+-					       uint32_t value)
+-{
+-	struct clk_stm32_priv *priv = clk_stm32_get_priv();
+-	uintptr_t addr = priv->base + pll->reg_pllxcr;
+-	const uint32_t mask = RCC_PLLNCR_DIVPEN | RCC_PLLNCR_DIVQEN |
+-			      RCC_PLLNCR_DIVREN;
+-
+-	io_clrsetbits32(addr, mask, value & mask);
+-}
+-
+ static int clk_stm32_pll_init(struct clk_stm32_priv *priv, int pll_idx,
+ 			      struct stm32_pll_dt_cfg *pll_conf)
+ {
+@@ -3416,7 +3394,6 @@ static int clk_stm32_pll_init(struct clk_stm32_priv *priv, int pll_idx,
+ 	int config_on_the_fly = -1;
+ 	int ret = 0;
+ 	uint8_t sel = 0;
+-	uint32_t save_div_pqr_en = 0;
+ 	int mux_system[] = { MUX_MPU, MUX_AXI, MUX_MCU, -1 };
+ 	int mux_sys  = mux_system[pll_idx];
+ 
+@@ -3425,9 +3402,6 @@ static int clk_stm32_pll_init(struct clk_stm32_priv *priv, int pll_idx,
+ 	if (ret != 0)
+ 		return ret;
+ 
+-	/* Backup status of DIV DIVPEN / DIVQEN / DIVREN */
+-	save_div_pqr_en = clk_stm32_pll_backup_output_diven(pll);
+-
+ 	if (config_on_the_fly == -1) {
+ 		/* Make a backup to the current parent and switch to HSI */
+ 		sel = clk_stm32_pll_init_switch_to_hsi_clk_system(mux_sys);
+@@ -3459,7 +3433,9 @@ static int clk_stm32_pll_init(struct clk_stm32_priv *priv, int pll_idx,
+ 		if (stm32_gate_rdy_enable(pll->gate_id))
+ 			return -1;
+ 
+-		clk_stm32_pll_restore_output_diven(pll, save_div_pqr_en);
++		io_setbits32(priv->base + pll->reg_pllxcr, RCC_PLLNCR_DIVPEN |
++						   RCC_PLLNCR_DIVQEN |
++						   RCC_PLLNCR_DIVREN);
+ 	}
+ 
+ 	if ((config_on_the_fly == -1) && (mux_sys != -1)) {
+diff --git a/core/drivers/firewall/stm32_rifsc.c b/core/drivers/firewall/stm32_rifsc.c
+index 9a4098f3f4..d43695fb78 100644
+--- a/core/drivers/firewall/stm32_rifsc.c
++++ b/core/drivers/firewall/stm32_rifsc.c
+@@ -90,6 +90,7 @@
+ 					 RIFSC_RISC_SEML_MASK)
+ 
+ #define RIFSC_RIMC_MODE_MASK		BIT(2)
++#define RIFSC_RIMC_CIDSEL_SHIFT		U(2)
+ #define RIFSC_RIMC_MCID_MASK		GENMASK_32(6, 4)
+ #define RIFSC_RIMC_MSEC_MASK		BIT(8)
+ #define RIFSC_RIMC_MPRIV_MASK		BIT(9)
+@@ -124,6 +125,7 @@ struct rifsc_platdata {
+ 	int nrisup;
+ 	struct rimu_cfg *rimu;
+ 	int nrimu;
++	bool errata_ahbrisab;
+ };
+ 
+ struct dt_id_attr {
+@@ -131,6 +133,78 @@ struct dt_id_attr {
+ 	fdt32_t id_attr[1];
+ };
+ 
++struct rimu_risup_pairs {
++	uint32_t rimu_id;
++	uint32_t risup_id;
++};
++
++static const struct rimu_risup_pairs rimu_risup[] = {
++	[0] = {
++		.rimu_id = 0,
++		.risup_id = 0,
++	},
++	[1] = {
++		.rimu_id = 1,
++		.risup_id = STM32MP25_RIFSC_SDMMC1_ID,
++	},
++	[2] = {
++		.rimu_id = 2,
++		.risup_id = STM32MP25_RIFSC_SDMMC2_ID,
++	},
++	[3] = {
++		.rimu_id = 3,
++		.risup_id = STM32MP25_RIFSC_SDMMC3_ID,
++	},
++	[4] = {
++		.rimu_id = 4,
++		.risup_id = STM32MP25_RIFSC_USB3DR_ID,
++	},
++	[5] = {
++		.rimu_id = 5,
++		.risup_id = STM32MP25_RIFSC_USBH_ID,
++	},
++	[6] = {
++		.rimu_id = 6,
++		.risup_id = STM32MP25_RIFSC_ETH1_ID,
++	},
++	[7] = {
++		.rimu_id = 7,
++		.risup_id = STM32MP25_RIFSC_ETH2_ID,
++	},
++	[8] = {
++		.rimu_id = 8,
++		.risup_id = STM32MP25_RIFSC_PCIE_ID,
++	},
++	[9] = {
++		.rimu_id = 9,
++		.risup_id = STM32MP25_RIFSC_GPU_ID,
++	},
++	[10] = {
++		.rimu_id = 10,
++		.risup_id = STM32MP25_RIFSC_DCMIPP_ID,
++	},
++	[11] = {
++		.rimu_id = 11,
++		.risup_id = 0,
++	},
++	[12] = {
++		.rimu_id = 12,
++		.risup_id = 0,
++	},
++	[13] = {
++		.rimu_id = 13,
++		.risup_id = 0,
++	},
++	[14] = {
++		.rimu_id = 14,
++		.risup_id = STM32MP25_RIFSC_VDEC_ID,
++	},
++	[15] = {
++		.rimu_id = 15,
++		.risup_id = STM32MP25_RIFSC_VENC_ID,
++	},
++};
++
+ static struct stm32_firewall_device *fdev;
+ static struct rifsc_driver_data rifsc_drvdata;
+ static struct rifsc_platdata rifsc_pdata;
+@@ -298,6 +372,9 @@ static TEE_Result stm32_rifsc_parse_fdt(const void *fdt, int node,
+ 	if (res)
+ 		return res;
+ 
++	rifsc_pdata.errata_ahbrisab = fdt_getprop(fdt, node,
++						  "st,errata-ahbrisab", NULL);
++
+ 	return TEE_SUCCESS;
+ }
+ 
+@@ -480,6 +557,75 @@ static TEE_Result stm32_risup_setup(struct rifsc_platdata *pdata)
+ 	return TEE_SUCCESS;
+ }
+ 
++/*
++ * Errata: When CID filtering is enabled on one of RISAB 3/4/5 instances, we
++ * forbid the use of CID0 for any initiator on the bus to handle spurious CID0
++ * transactions on these RAMs.
++ */
++static void stm32_rimu_errata_ahbrisab(struct rifsc_platdata *pdata,
++				       struct rimu_cfg *rimu)
++{
++	unsigned int i = 0;
++
++	if (!pdata->errata_ahbrisab)
++		return;
++
++	for (i = 0; i < ARRAY_SIZE(rimu_risup); i++) {
++		if (rimu->id == rimu_risup[i].rimu_id) {
++			rimu->risup_id = rimu_risup[i].risup_id;
++			break;
++		}
++	}
++
++	if (rimu->attr & RIFSC_RIMC_MODE_MASK) {
++		/* No inheritance mode for this RIMU */
++		if ((rimu->attr & RIFSC_RIMC_MCID_MASK) >>
++		    RIFSC_RIMC_MCID_SHIFT == RIF_CID0) {
++			EMSG("A CID should be set for RIMU %u", rimu->id);
++			if (!IS_ENABLED(CFG_INSECURE))
++				panic();
++			}
++	} else {
++		struct risup_cfg *risup = NULL;
++		uint32_t risup_cidcfgr = 0;
++		int j = 0;
++
++		/* Handle RIMU with no inheritance mode */
++		if (!rimu->risup_id) {
++			EMSG("RIMU%u cannot be set in inheritance mode",
++			     rimu->id);
++			if (!IS_ENABLED(CFG_INSECURE))
++				panic();
++			return;
++		}
++
++		for (j = 0; j < pdata->nrisup; j++) {
++			if (rimu->risup_id == pdata->risup[j].id) {
++				risup = &pdata->risup[j];
++				break;
++			}
++		}
++
++		if (!risup)
++			panic();
++
++		risup_cidcfgr = io_read32(pdata->base +
++					  _RIFSC_RISC_PER0_CIDCFGR +
++					  _OFST_PERX_CIDCFGR * risup->id);
++
++		if (!(risup_cidcfgr & RIFSC_RISC_CFEN_MASK) ||
++		    (!(risup_cidcfgr & RIFSC_RISC_SEM_EN_MASK) &&
++		     ((risup_cidcfgr & RIFSC_RISC_SCID_MASK) >>
++		      RIFSC_RISC_SCID_SHIFT) == RIF_CID0) ||
++		    (risup_cidcfgr & RIFSC_RISC_SEM_EN_MASK &&
++		     risup_cidcfgr & BIT(RIFSC_RISC_SEML_SHIFT))) {
++			EMSG("RIMU%u in inheritance mode with CID0", rimu->id);
++			if (!IS_ENABLED(CFG_INSECURE))
++				panic();
++		}
++	}
++}
++
+ static TEE_Result stm32_rimu_cfg(struct rifsc_platdata *pdata,
+ 				 struct rimu_cfg *rimu)
+ {
+@@ -489,6 +635,8 @@ static TEE_Result stm32_rimu_cfg(struct rifsc_platdata *pdata,
+ 	if (!rimu || rimu->id >= drv_data->nb_rimu)
+ 		return TEE_ERROR_BAD_PARAMETERS;
+ 
++	stm32_rimu_errata_ahbrisab(pdata, rimu);
++
+ 	if (drv_data->rif_en)
+ 		io_write32(pdata->base + offset, rimu->attr);
+ 
+diff --git a/core/drivers/firewall/stm32_risab.c b/core/drivers/firewall/stm32_risab.c
+index 2bb356f6ea..d977ccc871 100644
+--- a/core/drivers/firewall/stm32_risab.c
++++ b/core/drivers/firewall/stm32_risab.c
+@@ -89,6 +89,7 @@ struct stm32_risab_pdata {
+ 	uintptr_t base;
+ 	uint32_t pages_configured;
+ 	bool srwiad;
++	bool errata_ahbrisab;
+ 
+ 	SLIST_ENTRY(stm32_risab_pdata) link;
+ };
+@@ -118,7 +119,7 @@ void stm32_risab_clear_illegal_access_flags(void)
+ 	}
+ }
+ 
+-#if TRACE_LEVEL >= TRACE_INFO
++#ifdef CFG_TEE_CORE_DEBUG
+ void stm32_risab_dump_erroneous_data(void)
+ {
+ 	struct stm32_risab_pdata *risab = NULL;
+@@ -146,7 +147,7 @@ void stm32_risab_dump_erroneous_data(void)
+ 		clk_disable(risab->clock);
+ 	};
+ }
+-#endif /* TRACE_LEVEL >= TRACE_INFO */
++#endif /* CFG_TEE_CORE_DEBUG */
+ 
+ static bool regs_access_granted(struct stm32_risab_pdata *risab_d,
+ 				unsigned int reg_idx)
+@@ -230,8 +231,15 @@ static void set_read_conf(struct stm32_risab_pdata *risab_d,
+ 	uint32_t mask = GENMASK_32(last_page, first_page);
+ 
+ 	for (i = 0; i < RISAB_NB_MAX_CID_SUPPORTED; i++) {
+-		io_clrsetbits32(risab_d->base + _RISAB_CIDxRDCFGR(i), mask,
+-				risab_d->subr_cfg[reg_idx].rlist[i]);
++		/*
++		 * Errata: CID0 must be authorized for RISAB accesses if
++		 * CID filtering is enabled on some RISAB instances so that
++		 * spurious CID0 transactions are handled.
++		 */
++		if (risab_d->subr_cfg[reg_idx].rlist[i] ||
++		    (risab_d->errata_ahbrisab && i == RIF_CID0))
++			io_clrsetbits32(risab_d->base + _RISAB_CIDxRDCFGR(i),
++					mask, mask);
+ 	}
+ }
+ 
+@@ -245,8 +253,15 @@ static void set_write_conf(struct stm32_risab_pdata *risab_d,
+ 	uint32_t mask = GENMASK_32(last_page, first_page);
+ 
+ 	for (i = 0; i < RISAB_NB_MAX_CID_SUPPORTED; i++) {
+-		io_clrsetbits32(risab_d->base + _RISAB_CIDxWRCFGR(i), mask,
+-				risab_d->subr_cfg[reg_idx].wlist[i]);
++		/*
++		 * Errata: CID0 must be authorized for RISAB accesses if
++		 * CID filtering is enabled on some RISAB instances so that
++		 * spurious CID0 transactions are handled.
++		 */
++		if (risab_d->subr_cfg[reg_idx].rlist[i] ||
++		    (risab_d->errata_ahbrisab && i == RIF_CID0))
++			io_clrsetbits32(risab_d->base + _RISAB_CIDxWRCFGR(i),
++					mask, mask);
+ 	}
+ }
+ 
+@@ -419,6 +434,9 @@ static TEE_Result parse_dt(const void *fdt, int node,
+ 	if (cuint)
+ 		risab_d->srwiad = true;
+ 
++	risab_d->errata_ahbrisab = fdt_getprop(fdt, node, "st,errata-ahbrisab",
++					       NULL);
++
+ 	/* Get the memory region being configured */
+ 	cuint = fdt_getprop(fdt, node, "st,mem-map", &lenp);
+ 	if (!cuint)
+diff --git a/core/drivers/remoteproc/stm32_remoteproc.c b/core/drivers/remoteproc/stm32_remoteproc.c
+index 9517c232d7..e1311061d7 100644
+--- a/core/drivers/remoteproc/stm32_remoteproc.c
++++ b/core/drivers/remoteproc/stm32_remoteproc.c
+@@ -545,7 +545,6 @@ static TEE_Result stm32_rproc_parse_mems(struct stm32_rproc_instance *rproc,
+ 
+ 	for (i = 0; i < n_regions; i++) {
+ 		int pnode = 0;
+-		uint32_t sec_mem = 0;
+ 
+ 		pnode = fdt_node_offset_by_phandle(fdt, fdt32_to_cpu(list[i]));
+ 		if (pnode < 0) {
+@@ -566,19 +565,12 @@ static TEE_Result stm32_rproc_parse_mems(struct stm32_rproc_instance *rproc,
+ 		if (res)
+ 			goto err;
+ 
+-		/* TODO remove temporary property and use firewall */
+-		res = _fdt_read_uint32_index(fdt, node, "st,s-memory-region",
+-					     i, &sec_mem);
+-		if (res)
+-			sec_mem = 0;
+-
+ 		if (!regions[i].addr || !regions[i].size) {
+ 			res = TEE_ERROR_BAD_PARAMETERS;
+ 			goto err;
+ 		}
+ 
+-		DMSG("register %s region %#"PRIxPA" size %#zx",
+-		     sec_mem ? "sec" : " nsec",
++		DMSG("register region %#"PRIxPA" size %#zx",
+ 		     regions[i].addr, regions[i].size);
+ 	}
+ 
+diff --git a/core/drivers/stm32_bsec3.c b/core/drivers/stm32_bsec3.c
+index 5f3b28510e..ffd977b0f8 100644
+--- a/core/drivers/stm32_bsec3.c
++++ b/core/drivers/stm32_bsec3.c
+@@ -868,8 +868,6 @@ static void stm32_bsec_shadow_load(uint32_t status)
+ 	uint32_t srlock[OTP_ACCESS_SIZE] = { 0U };
+ 	uint32_t swlock[OTP_ACCESS_SIZE] = { 0U };
+ 	uint32_t splock[OTP_ACCESS_SIZE] = { 0U };
+-	uint32_t sfsr[OTP_ACCESS_SIZE] = { 0U };
+-	uint32_t otpvldr[OTP_ACCESS_SIZE] = { 0U };
+ 	uint32_t mask = 0U;
+ 	unsigned int max_id = bsec_dev.max_id;
+ 
+@@ -893,8 +891,6 @@ static void stm32_bsec_shadow_load(uint32_t status)
+ 		srlock[bank] = io_read32(bsec_base() + BSEC_SRLOCK(bank));
+ 		swlock[bank] = io_read32(bsec_base() + BSEC_SWLOCK(bank));
+ 		splock[bank] = io_read32(bsec_base() + BSEC_SPLOCK(bank));
+-		sfsr[bank] = io_read32(bsec_base() + BSEC_SFSR(bank));
+-		otpvldr[bank] = io_read32(bsec_base() + BSEC_OTPVLDR(bank));
+ 	}
+ 
+ 	for (otp = 0U; otp <= max_id ; otp++) {
+@@ -920,9 +916,8 @@ static void stm32_bsec_shadow_load(uint32_t status)
+ 			continue;
+ 		}
+ 
+-		/* request shadow if not yet done or not valid */
+-		if (!(sfsr[bank] & mask) || !(otpvldr[bank] & mask))
+-			shadow_otp(otp);
++		/* reload shadow to read Permanent Programing Lock Flag */
++		shadow_otp(otp);
+ 
+ 		bsec_dev.shadow->value[otp] = io_read32(bsec_base() +
+ 					      BSEC_FVR(otp));
+diff --git a/core/drivers/stm32_exti.c b/core/drivers/stm32_exti.c
+index 4f31815387..672ea5b4f9 100644
+--- a/core/drivers/stm32_exti.c
++++ b/core/drivers/stm32_exti.c
+@@ -350,7 +350,7 @@ static TEE_Result stm32_exti_rif_apply(const struct stm32_exti_pdata *exti)
+ 			if (!(BIT(bit_offset) & exti->access_mask[i]))
+ 				continue;
+ 
+-			io_clrbits32(exti->base + _EXTI_EnCIDCFGR(i),
++			io_clrbits32(exti->base + _EXTI_EnCIDCFGR(event),
+ 				     _EXTI_CIDCFGR_CONF_MASK);
+ 		}
+ 
+@@ -383,8 +383,8 @@ static TEE_Result stm32_exti_rif_apply(const struct stm32_exti_pdata *exti)
+ 		if (!(BIT(bit_offset) & exti->access_mask[i]))
+ 			continue;
+ 
+-		io_clrsetbits32(exti->base + _EXTI_EnCIDCFGR(i),
+-				_EXTI_CIDCFGR_CONF_MASK, exti->e_cids[i]);
++		io_clrsetbits32(exti->base + _EXTI_EnCIDCFGR(event),
++				_EXTI_CIDCFGR_CONF_MASK, exti->e_cids[event]);
+ 	}
+ 	for (i = 0; i < stm32_exti_nbcpus(exti); i++) {
+ 		if (!(exti->c_cids[i] & _CIDCFGR_CFEN))
+@@ -430,7 +430,8 @@ static void stm32_exti_rif_save(struct stm32_exti_pdata *exti)
+ 		if (!(BIT(bit_offset) & exti->access_mask[i]))
+ 			continue;
+ 
+-		exti->e_cids[i] = io_read32(exti->base + _EXTI_EnCIDCFGR(i));
++		exti->e_cids[event] = io_read32(exti->base +
++						_EXTI_EnCIDCFGR(event));
+ 	}
+ 	for (i = 0; i < stm32_exti_nbcpus(exti); i++)
+ 		exti->c_cids[i] = io_read32(exti->base + _EXTI_CmCIDCFGR(i));
+diff --git a/core/drivers/stm32_hpdma.c b/core/drivers/stm32_hpdma.c
+index 9cc32d41cc..1f4a1bdfba 100644
+--- a/core/drivers/stm32_hpdma.c
++++ b/core/drivers/stm32_hpdma.c
+@@ -38,7 +38,9 @@
+  * CIDCFGR register bitfields
+  */
+ #define _HPDMA_CIDCFGR_SEMWL_MASK	GENMASK_32(23, 16)
++#define _HPDMA_CIDCFGR_SEMWL_SHIFT	U(16)
+ #define _HPDMA_CIDCFGR_SCID_MASK	GENMASK_32(5, 4)
++#define _HPDMA_CIDCFGR_SCID_SHIFT	U(4)
+ #define _HPDMA_CIDCFGR_CONF_MASK	(_CIDCFGR_CFEN |	 \
+ 					 _CIDCFGR_SEMEN |	 \
+ 					 _HPDMA_CIDCFGR_SCID_MASK |\
+@@ -79,6 +81,7 @@ struct hpdma_pdata {
+ 	struct rif_conf_data conf_data;
+ 	unsigned int nb_channels;
+ 	vaddr_t base;
++	bool errata_ahbrisab;
+ 
+ 	SLIST_ENTRY(hpdma_pdata) link;
+ };
+@@ -133,12 +136,30 @@ static TEE_Result apply_rif_config(struct hpdma_pdata *hpdma_d, bool is_tdcid)
+ 		goto end;
+ 
+ 	for (i = 0; i < HPDMA_RIF_CHANNELS; i++) {
++		uint32_t cid_conf = hpdma_d->conf_data.cid_confs[i];
++
+ 		if (!(BIT(i) & hpdma_d->conf_data.access_mask[0]))
+ 			continue;
+ 
++		/*
++		 * Errata: When CID filtering is enabled on one of RISAB 3/4/5
++		 * instances, we forbid the use of CID0 for any initiator on the
++		 * bus to handle spurious CID0 transactions on these RAMs.
++		 */
++		if (hpdma_d->errata_ahbrisab &&
++		    (!(cid_conf & _CIDCFGR_CFEN) ||
++		     (!(cid_conf & _CIDCFGR_SEMEN) &&
++		      ((cid_conf & _HPDMA_CIDCFGR_SCID_MASK) >>
++		       _HPDMA_CIDCFGR_SCID_SHIFT) == RIF_CID0) ||
++		     (cid_conf & _CIDCFGR_SEMEN &&
++		      cid_conf & BIT(_HPDMA_CIDCFGR_SEMWL_SHIFT)))) {
++			EMSG("HPDMA channel cannot hold CID0 value");
++			if (!IS_ENABLED(CFG_INSECURE))
++				panic();
++		}
++
+ 		io_clrsetbits32(hpdma_d->base + _HPDMA_CIDCFGR(i),
+-				_HPDMA_CIDCFGR_CONF_MASK,
+-				hpdma_d->conf_data.cid_confs[i]);
++				_HPDMA_CIDCFGR_CONF_MASK, cid_conf);
+ 
+ 		cidcfgr = io_read32(hpdma_d->base + _HPDMA_CIDCFGR(i));
+ 
+@@ -219,6 +240,9 @@ static TEE_Result parse_dt(const void *fdt, int node,
+ 	if (res)
+ 		return res;
+ 
++	hpdma_d->errata_ahbrisab = fdt_getprop(fdt, node, "st,errata-ahbrisab",
++					       NULL);
++
+ 	cuint = fdt_getprop(fdt, node, "st,protreg", &lenp);
+ 	if (!cuint)
+ 		panic("No RIF configuration available");
+diff --git a/core/include/drivers/stm32_rifsc.h b/core/include/drivers/stm32_rifsc.h
+index 52bac6a2ea..16a9b41497 100644
+--- a/core/include/drivers/stm32_rifsc.h
++++ b/core/include/drivers/stm32_rifsc.h
+@@ -17,8 +17,16 @@ struct risup_cfg {
+ 	bool pm_sem;
+ };
+ 
++/**
++ * struct rimu_cfg - RIMU configuration
++ *
++ * @id: ID of the RIMU
++ * @risup_id: ID of the associated RISUP
++ * @attr: RIMU configuration attributes
++ */
+ struct rimu_cfg {
+ 	uint32_t id;
++	uint32_t risup_id;
+ 	uint32_t attr;
+ };
+ 
+diff --git a/core/include/drivers/stm32_risab.h b/core/include/drivers/stm32_risab.h
+index c57a8ad28f..6cf97b2db9 100644
+--- a/core/include/drivers/stm32_risab.h
++++ b/core/include/drivers/stm32_risab.h
+@@ -17,13 +17,13 @@ struct mem_region {
+ 
+ void stm32_risab_clear_illegal_access_flags(void);
+ 
+-#if TRACE_LEVEL >= TRACE_INFO
++#ifdef CFG_TEE_CORE_DEBUG
+ void stm32_risab_dump_erroneous_data(void);
+-#else /* TRACE_LEVEL >= TRACE_INFO */
++#else /* CFG_TEE_CORE_DEBUG */
+ static inline void stm32_risab_dump_erroneous_data(void)
+ {
+ }
+-#endif /* TRACE_LEVEL >= TRACE_INFO */
++#endif /* CFG_TEE_CORE_DEBUG */
+ 
+ /**
+  * stm32_risaf_reconfigure_region() - Allows to reconfigure a previously
+diff --git a/core/include/dt-bindings/clock/stm32mp25-clksrc.h b/core/include/dt-bindings/clock/stm32mp25-clksrc.h
+index e949ddf80a..a027336018 100644
+--- a/core/include/dt-bindings/clock/stm32mp25-clksrc.h
++++ b/core/include/dt-bindings/clock/stm32mp25-clksrc.h
+@@ -57,14 +57,14 @@
+ #define CLK_NOMUX	0x00000010
+ 
+ /* Flexgen define */
+-#define FLEX_ID_SHIFT	13
+-#define FLEX_SEL_SHIFT	9
++#define FLEX_ID_SHIFT	20
++#define FLEX_SEL_SHIFT	16
+ #define FLEX_PDIV_SHIFT	6
+ #define FLEX_FDIV_SHIFT	0
+ 
+-#define FLEX_ID_MASK	GENMASK_32(18, 13)
+-#define FLEX_SEL_MASK	GENMASK_32(12, 9)
+-#define FLEX_PDIV_MASK	GENMASK_32(8, 6)
++#define FLEX_ID_MASK	GENMASK_32(25, 20)
++#define FLEX_SEL_MASK	GENMASK_32(19, 16)
++#define FLEX_PDIV_MASK	GENMASK_32(15, 6)
+ #define FLEX_FDIV_MASK	GENMASK_32(5, 0)
+ 
+ #define DIV_CFG(div_id, div)	((CMD_DIV << CMD_SHIFT) |\
+diff --git a/core/lib/scmi-server/SCP-firmware/product/optee-stm32mp2/fw/config_all.c b/core/lib/scmi-server/SCP-firmware/product/optee-stm32mp2/fw/config_all.c
+index f8cfae1d30..ad2047acf2 100644
+--- a/core/lib/scmi-server/SCP-firmware/product/optee-stm32mp2/fw/config_all.c
++++ b/core/lib/scmi-server/SCP-firmware/product/optee-stm32mp2/fw/config_all.c
+@@ -499,7 +499,7 @@ static void allocate_global_resources(struct scpfw_config *cfg)
+ 
+ static void set_scmi_comm_resources(struct scpfw_config *cfg)
+ {
+-    unsigned int channel_index;
++    unsigned int channel_index = 0;
+     size_t i, j;
+     /* @cfg does not consider agent #0 this the reserved platform/server agent */
+     size_t scmi_agent_count = cfg->agent_count + 1;
+@@ -529,8 +529,6 @@ static void set_scmi_comm_resources(struct scpfw_config *cfg)
+         .sub_vendor_identifier = "ST",
+     };
+ 
+-    channel_index = 0;
+-
+     for (i = 0; i < cfg->agent_count; i++) {
+         struct scpfw_agent_config *agent_cfg = cfg->agent_config + i;
+         size_t agent_index = i + 1;
+@@ -544,7 +542,8 @@ static void set_scmi_comm_resources(struct scpfw_config *cfg)
+ 
+             service_data = fwk_mm_calloc(1, sizeof(*service_data));
+             *service_data = (struct mod_scmi_service_config){
+-                .transport_id = (fwk_id_t)FWK_ID_ELEMENT_INIT(FWK_MODULE_IDX_MSG_SMT, 0),
++                .transport_id = (fwk_id_t)FWK_ID_ELEMENT_INIT(FWK_MODULE_IDX_MSG_SMT,
++                                                              channel_index),
+                 .transport_api_id = (fwk_id_t)FWK_ID_API_INIT(FWK_MODULE_IDX_MSG_SMT,
+                                                               MOD_MSG_SMT_API_IDX_SCMI_TRANSPORT),
+                 .scmi_agent_id = agent_cfg->agent_id,
+@@ -714,8 +713,8 @@ static void set_resources(struct scpfw_config *cfg)
+                         name = reserved;
+                     }
+ 
+-                    dev[regu_index].element_id =
+-                       (fwk_id_t)FWK_ID_ELEMENT_INIT(FWK_MODULE_IDX_VOLTAGE_DOMAIN, k);
++                    dev[k].element_id =
++                       (fwk_id_t)FWK_ID_ELEMENT_INIT(FWK_MODULE_IDX_VOLTAGE_DOMAIN, regu_index);
+ 
+                     optee_regu_elt[regu_index].name = name;
+                     optee_regu_elt[regu_index].data = (void *)(optee_regu_data + regu_index);
+diff --git a/core/lib/scmi-server/sub.mk b/core/lib/scmi-server/sub.mk
+index 2327e5d573..dc1722cca4 100644
+--- a/core/lib/scmi-server/sub.mk
++++ b/core/lib/scmi-server/sub.mk
+@@ -55,8 +55,12 @@ cppflags-lib-y += -DBUILD_VERSION_MAJOR=$(scpfw-integ-version-maj) \
+ 		  -DBUILD_VERSION_MINOR=$(scpfw-integ-version-min) \
+ 		  -DBUILD_VERSION_PATCH=$(scpfw-integ-version-pat)
+ 
++ifeq ($(_CFG_SCP_FIRMWARE_IN_TREE),y)
++scpfw-impl-version := $(shell echo $(scpfw-integ-version)-intree-optee-os-$(TEE_IMPL_VERSION))
++else
+ scpfw-impl-version := $(shell git -C $(scpfw-src-path) describe --tags --always --dirty=-dev 2>/dev/null || \
+-                      echo Unknown_$(scpfw-integ-version))
++			echo Unknown_$(scpfw-integ-version))
++endif
+ cppflags-lib-y += -DBUILD_VERSION_DESCRIBE_STRING=\"$(scpfw-impl-version)\"
+ 
+ cppflags-lib-y += -DFWK_LOG_LEVEL=$(CFG_SCPFW_LOG_LEVEL)
+-- 
+2.25.1
+
