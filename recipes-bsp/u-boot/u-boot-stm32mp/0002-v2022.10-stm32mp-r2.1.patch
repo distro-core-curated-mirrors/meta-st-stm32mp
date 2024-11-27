@@ -1,0 +1,1018 @@
+From bc61b338169793318efa07c614ba1f96c8515755 Mon Sep 17 00:00:00 2001
+From: vermaash <ashish.verma@st.com>
+Date: Mon, 25 Nov 2024 10:35:05 +0530
+Subject: [PATCH] U-BOOT: v2022.10-stm32mp-r2.1 Signed-off-by: vermaash
+ <ashish.verma@st.com>
+
+---
+ arch/arm/dts/stm32mp25-pinctrl.dtsi           |  32 +--
+ arch/arm/mach-stm32mp/Kconfig                 |   6 +
+ arch/arm/mach-stm32mp/Makefile                |   1 +
+ .../mach-stm32mp/cmd_stm32prog/stm32prog.c    |   9 +-
+ .../arm/mach-stm32mp/include/mach/sys_proto.h |   6 +-
+ arch/arm/mach-stm32mp/include/mach/timers.h   |  55 +++++
+ arch/arm/mach-stm32mp/stm32mp2/rifsc.c        |  14 +-
+ arch/arm/mach-stm32mp/stm32mp2/stm32mp25x.c   |   6 +-
+ arch/arm/mach-stm32mp/timers.c                |  82 +++++++
+ board/st/stm32mp1/stm32mp1.c                  |  22 +-
+ board/st/stm32mp2/stm32mp2.c                  |   4 +-
+ configs/stm32mp13_defconfig                   |   5 +
+ configs/stm32mp15_basic_defconfig             |   1 +
+ configs/stm32mp15_defconfig                   |   1 +
+ configs/stm32mp15_trusted_defconfig           |   1 +
+ configs/stm32mp25_defconfig                   |   1 +
+ drivers/clk/stm32/clk-stm32mp25.c             |  12 +-
+ drivers/fastboot/fb_mmc.c                     |   8 +-
+ drivers/phy/phy-stm32-usb2phy.c               |  39 +---
+ drivers/pwm/Kconfig                           |   8 +
+ drivers/pwm/Makefile                          |   1 +
+ drivers/pwm/pwm-stm32.c                       | 203 ++++++++++++++++++
+ drivers/usb/dwc3/gadget.c                     |   4 +
+ dts/Makefile                                  |   9 +-
+ 24 files changed, 451 insertions(+), 79 deletions(-)
+ create mode 100644 arch/arm/mach-stm32mp/include/mach/timers.h
+ create mode 100644 arch/arm/mach-stm32mp/timers.c
+ create mode 100644 drivers/pwm/pwm-stm32.c
+
+diff --git a/arch/arm/dts/stm32mp25-pinctrl.dtsi b/arch/arm/dts/stm32mp25-pinctrl.dtsi
+index b97e10591a6..a172cc1bd6e 100644
+--- a/arch/arm/dts/stm32mp25-pinctrl.dtsi
++++ b/arch/arm/dts/stm32mp25-pinctrl.dtsi
+@@ -523,13 +523,13 @@
+ 				 <STM32_PINMUX('E', 0, AF10)>, /* SDMMC1_D2 */
+ 				 <STM32_PINMUX('E', 1, AF10)>, /* SDMMC1_D3 */
+ 				 <STM32_PINMUX('E', 2, AF10)>; /* SDMMC1_CMD */
+-			slew-rate = <2>;
++			slew-rate = <1>;
+ 			drive-push-pull;
+ 			bias-disable;
+ 		};
+ 		pins2 {
+ 			pinmux = <STM32_PINMUX('E', 3, AF10)>; /* SDMMC1_CK */
+-			slew-rate = <3>;
++			slew-rate = <2>;
+ 			drive-push-pull;
+ 			bias-disable;
+ 		};
+@@ -541,19 +541,19 @@
+ 				 <STM32_PINMUX('E', 5, AF10)>, /* SDMMC1_D1 */
+ 				 <STM32_PINMUX('E', 0, AF10)>, /* SDMMC1_D2 */
+ 				 <STM32_PINMUX('E', 1, AF10)>; /* SDMMC1_D3 */
+-			slew-rate = <2>;
++			slew-rate = <1>;
+ 			drive-push-pull;
+ 			bias-disable;
+ 		};
+ 		pins2 {
+ 			pinmux = <STM32_PINMUX('E', 3, AF10)>; /* SDMMC1_CK */
+-			slew-rate = <3>;
++			slew-rate = <2>;
+ 			drive-push-pull;
+ 			bias-disable;
+ 		};
+ 		pins3 {
+ 			pinmux = <STM32_PINMUX('E', 2, AF10)>; /* SDMMC1_CMD */
+-			slew-rate = <2>;
++			slew-rate = <1>;
+ 			drive-open-drain;
+ 			bias-disable;
+ 		};
+@@ -577,13 +577,13 @@
+ 				 <STM32_PINMUX('E', 8, AF12)>, /* SDMMC2_D2 */
+ 				 <STM32_PINMUX('E', 12, AF12)>, /* SDMMC2_D3 */
+ 				 <STM32_PINMUX('E', 15, AF12)>; /* SDMMC2_CMD */
+-			slew-rate = <2>;
++			slew-rate = <1>;
+ 			drive-push-pull;
+ 			bias-pull-up;
+ 		};
+ 		pins2 {
+ 			pinmux = <STM32_PINMUX('E', 14, AF12)>; /* SDMMC2_CK */
+-			slew-rate = <3>;
++			slew-rate = <2>;
+ 			drive-push-pull;
+ 			bias-pull-up;
+ 		};
+@@ -595,19 +595,19 @@
+ 				 <STM32_PINMUX('E', 11, AF12)>, /* SDMMC2_D1 */
+ 				 <STM32_PINMUX('E', 8, AF12)>, /* SDMMC2_D2 */
+ 				 <STM32_PINMUX('E', 12, AF12)>; /* SDMMC2_D3 */
+-			slew-rate = <2>;
++			slew-rate = <1>;
+ 			drive-push-pull;
+ 			bias-pull-up;
+ 		};
+ 		pins2 {
+ 			pinmux = <STM32_PINMUX('E', 14, AF12)>; /* SDMMC2_CK */
+-			slew-rate = <3>;
++			slew-rate = <2>;
+ 			drive-push-pull;
+ 			bias-pull-up;
+ 		};
+ 		pins3 {
+ 			pinmux = <STM32_PINMUX('E', 15, AF12)>; /* SDMMC2_CMD */
+-			slew-rate = <2>;
++			slew-rate = <1>;
+ 			drive-open-drain;
+ 			bias-pull-up;
+ 		};
+@@ -630,7 +630,7 @@
+ 				 <STM32_PINMUX('E', 9, AF12)>, /* SDMMC2_D5 */
+ 				 <STM32_PINMUX('E', 6, AF12)>, /* SDMMC2_D6 */
+ 				 <STM32_PINMUX('E', 7, AF12)>; /* SDMMC2_D7 */
+-			slew-rate = <2>;
++			slew-rate = <1>;
+ 			drive-push-pull;
+ 			bias-pull-up;
+ 		};
+@@ -652,13 +652,13 @@
+ 				 <STM32_PINMUX('B', 12, AF10)>, /* SDMMC3_D2 */
+ 				 <STM32_PINMUX('I', 11, AF10)>, /* SDMMC3_D3 */
+ 				 <STM32_PINMUX('D', 12, AF10)>; /* SDMMC3_CMD */
+-			slew-rate = <2>;
++			slew-rate = <0>;
+ 			drive-push-pull;
+ 			bias-pull-up;
+ 		};
+ 		pins2 {
+ 			pinmux = <STM32_PINMUX('B', 13, AF10)>; /* SDMMC3_CK */
+-			slew-rate = <3>;
++			slew-rate = <1>;
+ 			drive-push-pull;
+ 			bias-pull-up;
+ 		};
+@@ -670,19 +670,19 @@
+ 				 <STM32_PINMUX('D', 13, AF10)>, /* SDMMC3_D1 */
+ 				 <STM32_PINMUX('B', 12, AF10)>, /* SDMMC3_D2 */
+ 				 <STM32_PINMUX('I', 11, AF10)>; /* SDMMC3_D3 */
+-			slew-rate = <2>;
++			slew-rate = <0>;
+ 			drive-push-pull;
+ 			bias-pull-up;
+ 		};
+ 		pins2 {
+ 			pinmux = <STM32_PINMUX('B', 13, AF10)>; /* SDMMC3_CK */
+-			slew-rate = <3>;
++			slew-rate = <1>;
+ 			drive-push-pull;
+ 			bias-pull-up;
+ 		};
+ 		pins3 {
+ 			pinmux = <STM32_PINMUX('D', 12, AF10)>; /* SDMMC3_CMD */
+-			slew-rate = <2>;
++			slew-rate = <0>;
+ 			drive-open-drain;
+ 			bias-pull-up;
+ 		};
+diff --git a/arch/arm/mach-stm32mp/Kconfig b/arch/arm/mach-stm32mp/Kconfig
+index d024ad0a617..1a89bbbc6b7 100644
+--- a/arch/arm/mach-stm32mp/Kconfig
++++ b/arch/arm/mach-stm32mp/Kconfig
+@@ -156,6 +156,12 @@ config CMD_STM32KEY
+ 		This command is used to evaluate the secure boot on stm32mp SOC,
+ 		it is deactivated by default in real products.
+ 
++config MFD_STM32_TIMERS
++	bool "STM32 multifonction timer support"
++	help
++	  Select this to enable support for the multifunction timer found on
++	  STM32 devices.
++
+ source "arch/arm/mach-stm32mp/Kconfig.13x"
+ source "arch/arm/mach-stm32mp/Kconfig.15x"
+ source "arch/arm/mach-stm32mp/Kconfig.25x"
+diff --git a/arch/arm/mach-stm32mp/Makefile b/arch/arm/mach-stm32mp/Makefile
+index 99e81488364..943d78acdf9 100644
+--- a/arch/arm/mach-stm32mp/Makefile
++++ b/arch/arm/mach-stm32mp/Makefile
+@@ -14,6 +14,7 @@ obj-$(CONFIG_STM32MP15X) += stm32mp1/
+ obj-$(CONFIG_STM32MP25X) += stm32mp2/
+ 
+ obj-$(CONFIG_STM32MP_TAMP_NVMEM) += nvram.o
++obj-$(CONFIG_MFD_STM32_TIMERS) += timers.o
+ 
+ ifdef CONFIG_SPL_BUILD
+ obj-y += spl.o
+diff --git a/arch/arm/mach-stm32mp/cmd_stm32prog/stm32prog.c b/arch/arm/mach-stm32mp/cmd_stm32prog/stm32prog.c
+index 6488bcb30bb..17994ee7911 100644
+--- a/arch/arm/mach-stm32mp/cmd_stm32prog/stm32prog.c
++++ b/arch/arm/mach-stm32mp/cmd_stm32prog/stm32prog.c
+@@ -790,8 +790,8 @@ static int init_device(struct stm32prog_data *data,
+ 			last_addr = (u64)(block_dev->lba - GPT_HEADER_SZ - 1) *
+ 				    block_dev->blksz;
+ 		}
+-		log_debug("MMC %d: lba=%ld blksz=%ld\n", dev->dev_id,
+-			  block_dev->lba, block_dev->blksz);
++		log_debug("MMC %d: lba=%lld blksz=%ld\n", dev->dev_id,
++			  (u64)block_dev->lba, block_dev->blksz);
+ 		log_debug(" available address = 0x%llx..0x%llx\n",
+ 			  first_addr, last_addr);
+ 		log_debug(" full_update = %d\n", dev->full_update);
+@@ -1219,7 +1219,10 @@ static int stm32prog_alt_add(struct stm32prog_data *data,
+ 	char multiplier,  type;
+ 
+ 	/* max 3 digit for sector size */
+-	if (part->size > SZ_1M) {
++	if (part->size > SZ_1G) {
++		size = (u32)(part->size / SZ_1G);
++		multiplier = 'G';
++	} else if (part->size > SZ_1M) {
+ 		size = (u32)(part->size / SZ_1M);
+ 		multiplier = 'M';
+ 	} else if (part->size > SZ_1K) {
+diff --git a/arch/arm/mach-stm32mp/include/mach/sys_proto.h b/arch/arm/mach-stm32mp/include/mach/sys_proto.h
+index 0b31386c8b8..583cac0066d 100644
+--- a/arch/arm/mach-stm32mp/include/mach/sys_proto.h
++++ b/arch/arm/mach-stm32mp/include/mach/sys_proto.h
+@@ -89,9 +89,9 @@ u32 get_cpu_package(void);
+ 
+ /* package used for STM32MP25x */
+ #define STM32MP25_PKG_CUSTOM		0
+-#define STM32MP25_PKG_AL_TBGA361	3
+-#define STM32MP25_PKG_AK_TBGA424	4
+-#define STM32MP25_PKG_AI_TBGA436	5
++#define STM32MP25_PKG_AL_VFBGA361	1
++#define STM32MP25_PKG_AK_VFBGA424	3
++#define STM32MP25_PKG_AI_TFBGA436	5
+ #define STM32MP25_PKG_UNKNOWN		7
+ 
+ /* Get SOC name */
+diff --git a/arch/arm/mach-stm32mp/include/mach/timers.h b/arch/arm/mach-stm32mp/include/mach/timers.h
+new file mode 100644
+index 00000000000..781cfc75bbd
+--- /dev/null
++++ b/arch/arm/mach-stm32mp/include/mach/timers.h
+@@ -0,0 +1,55 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/*
++ * Copyright (C) 2024, STMicroelectronics - All Rights Reserved
++ * Author: Cheick Traore <cheick.traore@foss.st.com>
++ *
++ * Originally based on the Linux kernel v6.1 include/linux/mfd/stm32-timers.h.
++ */
++
++#ifndef __STM32_TIMERS_H
++#define __STM32_TIMERS_H
++
++#include <clk.h>
++
++#define TIM_CR1		0x00	/* Control Register 1      */
++#define TIM_CR2		0x04	/* Control Register 2      */
++#define TIM_SMCR	0x08	/* Slave mode control reg  */
++#define TIM_DIER	0x0C	/* DMA/interrupt register  */
++#define TIM_SR		0x10	/* Status register	   */
++#define TIM_EGR		0x14	/* Event Generation Reg    */
++#define TIM_CCMR1	0x18	/* Capt/Comp 1 Mode Reg    */
++#define TIM_CCMR2	0x1C	/* Capt/Comp 2 Mode Reg    */
++#define TIM_CCER	0x20	/* Capt/Comp Enable Reg    */
++#define TIM_CNT		0x24	/* Counter		   */
++#define TIM_PSC		0x28	/* Prescaler               */
++#define TIM_ARR		0x2c	/* Auto-Reload Register    */
++#define TIM_CCRx(x)	(0x34 + 4 * ((x) - 1))	/* Capt/Comp Register x (x ∈ {1, .. 4})	*/
++#define TIM_BDTR	0x44	/* Break and Dead-Time Reg */
++#define TIM_DCR		0x48	/* DMA control register    */
++#define TIM_DMAR	0x4C	/* DMA register for transfer */
++#define TIM_TISEL	0x68	/* Input Selection         */
++
++#define TIM_CR1_CEN	BIT(0)	/* Counter Enable	   */
++#define TIM_CR1_ARPE	BIT(7)
++#define TIM_CCER_CCXE	(BIT(0) | BIT(4) | BIT(8) | BIT(12))
++#define TIM_CCER_CC1E	BIT(0)
++#define TIM_CCER_CC1P	BIT(1)	/* Capt/Comp 1  Polarity   */
++#define TIM_CCER_CC1NE	BIT(2)	/* Capt/Comp 1N out Ena    */
++#define TIM_CCER_CC1NP	BIT(3)	/* Capt/Comp 1N Polarity   */
++#define TIM_CCMR_PE	BIT(3)	/* Channel Preload Enable  */
++#define TIM_CCMR_M1	(BIT(6) | BIT(5))  /* Channel PWM Mode 1 */
++#define TIM_BDTR_MOE	BIT(15)	/* Main Output Enable      */
++#define TIM_EGR_UG	BIT(0)	/* Update Generation       */
++
++#define MAX_TIM_PSC		0xFFFF
++
++struct stm32_timers_plat {
++	void __iomem *base;
++};
++
++struct stm32_timers_priv {
++	u32 max_arr;
++	ulong rate;
++};
++
++#endif
+diff --git a/arch/arm/mach-stm32mp/stm32mp2/rifsc.c b/arch/arm/mach-stm32mp/stm32mp2/rifsc.c
+index 30432f823a7..4c7309d6135 100644
+--- a/arch/arm/mach-stm32mp/stm32mp2/rifsc.c
++++ b/arch/arm/mach-stm32mp/stm32mp2/rifsc.c
+@@ -160,13 +160,6 @@ static int rifsc_check_access(void *base, u32 id)
+ 		return -EACCES;
+ 	}
+ 
+-skip_cid_check:
+-	/* Check security configuration */
+-	if (sec_reg_value & BIT(reg_offset)) {
+-		log_debug("Invalid security configuration for peripheral %d\n", id);
+-		return -EACCES;
+-	}
+-
+ 	/* Check semaphore accesses */
+ 	if (cid_reg_value & CIDCFGR_SEMEN) {
+ 		if (!(FIELD_GET(RIFSC_RISC_SEMWL_MASK, cid_reg_value) & BIT(RIF_CID1))) {
+@@ -180,6 +173,13 @@ skip_cid_check:
+ 		}
+ 	}
+ 
++skip_cid_check:
++	/* Check security configuration */
++	if (sec_reg_value & BIT(reg_offset)) {
++		log_debug("Invalid security configuration for peripheral %d\n", id);
++		return -EACCES;
++	}
++
+ 	return 0;
+ }
+ 
+diff --git a/arch/arm/mach-stm32mp/stm32mp2/stm32mp25x.c b/arch/arm/mach-stm32mp/stm32mp2/stm32mp25x.c
+index 5885891ccd5..0817ed7e716 100644
+--- a/arch/arm/mach-stm32mp/stm32mp2/stm32mp25x.c
++++ b/arch/arm/mach-stm32mp/stm32mp2/stm32mp25x.c
+@@ -190,13 +190,13 @@ void get_soc_name(char name[SOC_NAME_SIZE])
+ 		case STM32MP25_PKG_CUSTOM:
+ 			package = "XX";
+ 			break;
+-		case STM32MP25_PKG_AL_TBGA361:
++		case STM32MP25_PKG_AL_VFBGA361:
+ 			package = "AL";
+ 			break;
+-		case STM32MP25_PKG_AK_TBGA424:
++		case STM32MP25_PKG_AK_VFBGA424:
+ 			package = "AK";
+ 			break;
+-		case STM32MP25_PKG_AI_TBGA436:
++		case STM32MP25_PKG_AI_TFBGA436:
+ 			package = "AI";
+ 			break;
+ 		default:
+diff --git a/arch/arm/mach-stm32mp/timers.c b/arch/arm/mach-stm32mp/timers.c
+new file mode 100644
+index 00000000000..37a16f41d3f
+--- /dev/null
++++ b/arch/arm/mach-stm32mp/timers.c
+@@ -0,0 +1,82 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Copyright (C) 2024, STMicroelectronics - All Rights Reserved
++ * Author: Cheick Traore <cheick.traore@foss.st.com>
++ *
++ * Originally based on the Linux kernel v6.1 drivers/mfd/stm32-timers.c.
++ */
++
++#include <dm.h>
++#include <asm/io.h>
++#include <asm/arch/timers.h>
++#include <dm/device_compat.h>
++
++static void stm32_timers_get_arr_size(struct udevice *dev)
++{
++	struct stm32_timers_plat *plat = dev_get_plat(dev);
++	struct stm32_timers_priv *priv = dev_get_priv(dev);
++	u32 arr;
++
++	/* Backup ARR to restore it after getting the maximum value */
++	arr = readl(plat->base + TIM_ARR);
++
++	/*
++	 * Only the available bits will be written so when readback
++	 * we get the maximum value of auto reload register
++	 */
++	writel(~0L, plat->base + TIM_ARR);
++	priv->max_arr = readl(plat->base + TIM_ARR);
++	writel(arr, plat->base + TIM_ARR);
++}
++
++static int stm32_timers_of_to_plat(struct udevice *dev)
++{
++	struct stm32_timers_plat *plat = dev_get_plat(dev);
++
++	plat->base = dev_read_addr_ptr(dev);
++	if (!plat->base) {
++		dev_err(dev, "can't get address\n");
++		return -ENOENT;
++	}
++
++	return 0;
++}
++
++static int stm32_timers_probe(struct udevice *dev)
++{
++	struct stm32_timers_priv *priv = dev_get_priv(dev);
++	struct clk clk;
++	int ret = 0;
++
++	ret = clk_get_by_index(dev, 0, &clk);
++	if (ret < 0)
++		return ret;
++
++	ret = clk_enable(&clk);
++	if (ret) {
++		dev_err(dev, "failed to enable clock: ret=%d\n", ret);
++		return ret;
++	}
++
++	priv->rate = clk_get_rate(&clk);
++
++	stm32_timers_get_arr_size(dev);
++
++	return ret;
++}
++
++static const struct udevice_id stm32_timers_ids[] = {
++	{ .compatible = "st,stm32-timers" },
++	{}
++};
++
++U_BOOT_DRIVER(stm32_timers) = {
++	.name  = "stm32_timers",
++	.id = UCLASS_NOP,
++	.of_match = stm32_timers_ids,
++	.of_to_plat = stm32_timers_of_to_plat,
++	.plat_auto = sizeof(struct stm32_timers_plat),
++	.probe = stm32_timers_probe,
++	.priv_auto = sizeof(struct stm32_timers_priv),
++	.bind = dm_scan_fdt_dev,
++};
+diff --git a/board/st/stm32mp1/stm32mp1.c b/board/st/stm32mp1/stm32mp1.c
+index 5a6a42c95ab..30dd55538de 100644
+--- a/board/st/stm32mp1/stm32mp1.c
++++ b/board/st/stm32mp1/stm32mp1.c
+@@ -1173,6 +1173,17 @@ void stm32mp15x_dk2_fdt_update(void *new_blob)
+ 			log_debug("touchscreen@38 node updated to @2a\n");
+ 		}
+ 	}
++
++	/* Get node from panel otm8009a node */
++	nodeoff = fdt_node_offset_by_compatible(new_blob, -1, "orisetech,otm8009a");
++	if (nodeoff < 0) {
++		log_warning("panel-otm8009a node not found\n");
++		return;
++	}
++
++	ret = fdt_delprop(new_blob, nodeoff, "reset-gpios");
++	if (ret != 0)
++		log_warning("fail to delete reset gpio %d\n", ret);
+ }
+ 
+ void fdt_update_panel_dsi(void *new_blob)
+@@ -1272,20 +1283,25 @@ int fdt_update_fwu_mdata(void *blob)
+ 		break;
+ 	case BOOT_FLASH_EMMC:
+ 		/* sdmmc2 */
+-		ret = fdt_update_fwu_properties(blob, nodeoff, "u-boot,fwu-mdata-mtd",
++		ret = fdt_update_fwu_properties(blob, nodeoff, "u-boot,fwu-mdata-gpt",
+ 						"/soc/mmc@58007000");
+ 		break;
+ 
+ 	case BOOT_FLASH_NAND:
+ 		/* nand@0 */
+-		ret = fdt_update_fwu_properties(blob, nodeoff, "u-boot,fwu-mdata-gpt",
++		ret = fdt_update_fwu_properties(blob, nodeoff, "u-boot,fwu-mdata-mtd",
+ 						"/soc/etzpc@5c007000/memory-controller@58002000/nand-controller@4,0/nand@0");
+ 		break;
+ 
+ 	case BOOT_FLASH_SPINAND:
++		/* flash0 */
++		ret = fdt_update_fwu_properties(blob, nodeoff, "u-boot,fwu-mdata-mtd",
++						"/soc/etzpc@5c007000/spi@58003000/spi-nand@0");
++		break;
++
+ 	case BOOT_FLASH_NOR:
+ 		/* flash0 */
+-		ret = fdt_update_fwu_properties(blob, nodeoff, "u-boot,fwu-mdata-gpt",
++		ret = fdt_update_fwu_properties(blob, nodeoff, "u-boot,fwu-mdata-mtd",
+ 						"/soc/etzpc@5c007000/spi@58003000/flash@0");
+ 		break;
+ 	}
+diff --git a/board/st/stm32mp2/stm32mp2.c b/board/st/stm32mp2/stm32mp2.c
+index 349075e9079..93111c75fd4 100644
+--- a/board/st/stm32mp2/stm32mp2.c
++++ b/board/st/stm32mp2/stm32mp2.c
+@@ -847,14 +847,14 @@ int fdt_update_fwu_mdata(void *blob)
+ 		break;
+ 	case BOOT_FLASH_EMMC:
+ 		/* sdmmc2 */
+-		ret = fdt_update_fwu_properties(blob, nodeoff, "u-boot,fwu-mdata-mtd",
++		ret = fdt_update_fwu_properties(blob, nodeoff, "u-boot,fwu-mdata-gpt",
+ 						"/soc@0/rifsc@42080000/mmc@48230000");
+ 		break;
+ 
+ 	case BOOT_FLASH_SPINAND:
+ 	case BOOT_FLASH_NOR:
+ 		/* flash0 */
+-		ret = fdt_update_fwu_properties(blob, nodeoff, "u-boot,fwu-mdata-gpt",
++		ret = fdt_update_fwu_properties(blob, nodeoff, "u-boot,fwu-mdata-mtd",
+ 						"/soc@0/ommanager@40500000/spi@40430000/flash@0");
+ 		break;
+ 	}
+diff --git a/configs/stm32mp13_defconfig b/configs/stm32mp13_defconfig
+index 0f2caf688a8..81bba2dfc47 100644
+--- a/configs/stm32mp13_defconfig
++++ b/configs/stm32mp13_defconfig
+@@ -9,6 +9,7 @@ CONFIG_SYS_PROMPT="STM32MP> "
+ CONFIG_STM32MP13X=y
+ CONFIG_DDR_CACHEABLE_SIZE=0x8000000
+ CONFIG_CMD_STM32KEY=y
++CONFIG_MFD_STM32_TIMERS=y
+ CONFIG_TARGET_ST_STM32MP13X=y
+ CONFIG_ENV_OFFSET_REDUND=0x940000
+ CONFIG_CMD_STM32PROG=y
+@@ -41,6 +42,7 @@ CONFIG_CMD_CLK=y
+ CONFIG_CMD_DFU=y
+ CONFIG_CMD_FUSE=y
+ CONFIG_CMD_GPIO=y
++CONFIG_CMD_PWM=y
+ CONFIG_CMD_I2C=y
+ CONFIG_CMD_LSBLK=y
+ CONFIG_CMD_MMC=y
+@@ -72,6 +74,7 @@ CONFIG_SYS_MMC_ENV_DEV=-1
+ CONFIG_ENV_MMC_USE_DT=y
+ CONFIG_TFTP_TSIZE=y
+ CONFIG_STM32_ADC=y
++CONFIG_SYS_64BIT_LBA=y
+ CONFIG_CLK_SCMI=y
+ CONFIG_DFU_TFTP=y
+ CONFIG_USB_FUNCTION_FASTBOOT=y
+@@ -113,6 +116,8 @@ CONFIG_DM_REGULATOR=y
+ CONFIG_DM_REGULATOR_FIXED=y
+ CONFIG_DM_REGULATOR_GPIO=y
+ CONFIG_DM_REGULATOR_SCMI=y
++CONFIG_DM_PWM=y
++CONFIG_PWM_STM32=y
+ CONFIG_RESET_SCMI=y
+ CONFIG_DM_RNG=y
+ CONFIG_RNG_STM32=y
+diff --git a/configs/stm32mp15_basic_defconfig b/configs/stm32mp15_basic_defconfig
+index 12aaa46f7c5..77578a04ef6 100644
+--- a/configs/stm32mp15_basic_defconfig
++++ b/configs/stm32mp15_basic_defconfig
+@@ -101,6 +101,7 @@ CONFIG_ENV_MMC_USE_DT=y
+ # CONFIG_SPL_ENV_IS_IN_SPI_FLASH is not set
+ CONFIG_TFTP_TSIZE=y
+ CONFIG_STM32_ADC=y
++CONFIG_SYS_64BIT_LBA=y
+ CONFIG_USB_FUNCTION_FASTBOOT=y
+ CONFIG_FASTBOOT_BUF_ADDR=0xC0000000
+ CONFIG_FASTBOOT_BUF_SIZE=0x02000000
+diff --git a/configs/stm32mp15_defconfig b/configs/stm32mp15_defconfig
+index 5f3fbac0023..a0cd0762c24 100644
+--- a/configs/stm32mp15_defconfig
++++ b/configs/stm32mp15_defconfig
+@@ -73,6 +73,7 @@ CONFIG_SYS_MMC_ENV_DEV=-1
+ CONFIG_ENV_MMC_USE_DT=y
+ CONFIG_TFTP_TSIZE=y
+ CONFIG_STM32_ADC=y
++CONFIG_SYS_64BIT_LBA=y
+ CONFIG_CLK_SCMI=y
+ CONFIG_DFU_TFTP=y
+ CONFIG_USB_FUNCTION_FASTBOOT=y
+diff --git a/configs/stm32mp15_trusted_defconfig b/configs/stm32mp15_trusted_defconfig
+index a40ef9f75b0..f8e356710bb 100644
+--- a/configs/stm32mp15_trusted_defconfig
++++ b/configs/stm32mp15_trusted_defconfig
+@@ -74,6 +74,7 @@ CONFIG_SYS_MMC_ENV_DEV=-1
+ CONFIG_ENV_MMC_USE_DT=y
+ CONFIG_TFTP_TSIZE=y
+ CONFIG_STM32_ADC=y
++CONFIG_SYS_64BIT_LBA=y
+ CONFIG_CLK_SCMI=y
+ CONFIG_DFU_TFTP=y
+ CONFIG_USB_FUNCTION_FASTBOOT=y
+diff --git a/configs/stm32mp25_defconfig b/configs/stm32mp25_defconfig
+index 80d1756180d..d4f77db3d57 100644
+--- a/configs/stm32mp25_defconfig
++++ b/configs/stm32mp25_defconfig
+@@ -71,6 +71,7 @@ CONFIG_ENV_UBI_PART="UBI"
+ CONFIG_ENV_UBI_VOLUME="uboot_config"
+ CONFIG_ENV_UBI_VOLUME_REDUND="uboot_config_r"
+ CONFIG_SYS_MMC_ENV_DEV=-1
++CONFIG_SYS_64BIT_LBA=y
+ CONFIG_BUTTON=y
+ CONFIG_BUTTON_GPIO=y
+ CONFIG_DFU_TFTP=y
+diff --git a/drivers/clk/stm32/clk-stm32mp25.c b/drivers/clk/stm32/clk-stm32mp25.c
+index c02094707d9..2010e091cb8 100644
+--- a/drivers/clk/stm32/clk-stm32mp25.c
++++ b/drivers/clk/stm32/clk-stm32mp25.c
+@@ -712,27 +712,27 @@ static const struct clock_config stm32mp25_clock_cfg[] = {
+ 		   SEC_RIFSC(USBH)),
+ 
+ 	/* USB2PHY2 */
+-	STM32_COMPOSITE_NODIV(CK_KER_USB2PHY2EN, "ck_ker_usb2phy2_en", 0, SEC_RIFSC(USBH),
++	STM32_COMPOSITE_NODIV(CK_KER_USB2PHY2EN, "ck_ker_usb2phy2_en", 0, SEC_RIFSC(USB3DR),
+ 			      GATE_USB2PHY2, MUX_USB2PHY2),
+ 
+ 	/* USB3 PCIe COMBOPHY */
+ 	STM32_GATE(CK_BUS_USB3PCIEPHY, "ck_icn_p_usb3pciephy", "ck_icn_apb4", 0, GATE_USB3PCIEPHY,
+-		   SEC_RIFSC(USB3DR)),
++		   SEC_RIFSC(COMBOPHY)),
+ 
+-	STM32_COMPOSITE_NODIV(CK_KER_USB3PCIEPHY, "ck_ker_usb3pciephy", 0, SEC_RIFSC(USB3DR),
++	STM32_COMPOSITE_NODIV(CK_KER_USB3PCIEPHY, "ck_ker_usb3pciephy", 0, SEC_RIFSC(COMBOPHY),
+ 			      GATE_USB3PCIEPHY, MUX_USB3PCIEPHY),
+ 
+ 	/* USB3 DRD */
+ 	STM32_GATE(CK_BUS_USB3DR, "ck_icn_m_usb3dr", "ck_icn_hsl", 0, GATE_USB3DR,
+ 		   SEC_RIFSC(USB3DR)),
+ 	STM32_GATE(CK_KER_USB2PHY2, "ck_ker_usb2phy2", "ck_flexgen_58", 0, GATE_USB3DR,
+-		   SEC_RIFSC(USBH)),
++		   SEC_RIFSC(USB3DR)),
+ 
+ 	/* USBTC */
+ 	STM32_GATE(CK_BUS_USBTC, "ck_icn_p_usbtc", "ck_flexgen_35", 0, GATE_USBTC,
+-		   SEC_RIFSC(USBH)),
++		   SEC_RIFSC(UCPD1)),
+ 	STM32_GATE(CK_KER_USBTC, "ck_ker_usbtc", "ck_flexgen_35", 0, GATE_USBTC,
+-		   SEC_RIFSC(USBH)),
++		   SEC_RIFSC(UCPD1)),
+ 
+ 	/* VDEC / VENC */
+ 	STM32_GATE(CK_BUS_VDEC, "ck_icn_p_vdec", "ck_icn_apb4", 0, GATE_VDEC, SEC_RIFSC(VDEC)),
+diff --git a/drivers/fastboot/fb_mmc.c b/drivers/fastboot/fb_mmc.c
+index 033c510bc09..01d258cfc2a 100644
+--- a/drivers/fastboot/fb_mmc.c
++++ b/drivers/fastboot/fb_mmc.c
+@@ -214,8 +214,8 @@ static int fb_mmc_erase_mmc_hwpart(struct blk_desc *dev_desc)
+ 		return 1;
+ 	}
+ 
+-	printf("........ erased %lu bytes from mmc hwpart[%u]\n",
+-	       dev_desc->lba * dev_desc->blksz, dev_desc->hwpart);
++	printf("........ erased %llu bytes from mmc hwpart[%u]\n",
++	       (u64)(dev_desc->lba * dev_desc->blksz), dev_desc->hwpart);
+ 
+ 	return 0;
+ }
+@@ -260,8 +260,8 @@ static void fb_mmc_boot_ops(struct blk_desc *dev_desc, void *buffer,
+ 			return;
+ 		}
+ 
+-		printf("........ wrote %lu bytes to EMMC_BOOT%d\n",
+-		       blkcnt * blksz, hwpart);
++		printf("........ wrote %llu bytes to EMMC_BOOT%d\n",
++		       (u64)(blkcnt * blksz), hwpart);
+ 	} else { /* erase */
+ 		if (fb_mmc_erase_mmc_hwpart(dev_desc)) {
+ 			pr_err("Failed to erase EMMC_BOOT%d\n", hwpart);
+diff --git a/drivers/phy/phy-stm32-usb2phy.c b/drivers/phy/phy-stm32-usb2phy.c
+index cc68319bf1b..d667ee46dc5 100644
+--- a/drivers/phy/phy-stm32-usb2phy.c
++++ b/drivers/phy/phy-stm32-usb2phy.c
+@@ -86,7 +86,6 @@ struct stm32_usb2phy {
+ 	struct udevice *vdd33;
+ 	struct udevice *vdda18;
+ 	uint init;
+-	bool internal_vbus_comp;
+ 	const struct stm32mp2_usb2phy_hw_data *hw_data;
+ };
+ 
+@@ -311,7 +310,7 @@ static int stm32_usb2phy_set_mode(struct phy *phy, enum phy_mode mode, int submo
+ 			 * are turned off, there is some internal error inside the usb3dr-ctrl
+ 			 * while running in usb3-speed
+ 			 */
+-			if (!phy_dev->internal_vbus_comp && submode == USB_ROLE_NONE) {
++			if (submode == USB_ROLE_NONE) {
+ 				ret = regmap_update_bits(phy_dev->regmap,
+ 							 phy_data->cr_offset,
+ 							 SYSCFG_USB2PHY2CR_USB2PHY2CMN_MASK |
+@@ -341,33 +340,23 @@ static int stm32_usb2phy_set_mode(struct phy *phy, enum phy_mode mode, int submo
+ 		 * VBUS is not present then usb-ctrl puts PHY in suspend and inturn
+ 		 * PHY turns off clocks to ctrl which makes the device-mode init fail
+ 		 */
+-		if (phy_dev->internal_vbus_comp) {
++		if (submode == USB_ROLE_NONE) {
+ 			ret = regmap_update_bits(phy_dev->regmap,
+ 						 phy_data->cr_offset,
+ 						 SYSCFG_USB2PHY2CR_USB2PHY2CMN_MASK |
+ 						 SYSCFG_USB2PHY2CR_VBUSVALID_MASK |
+ 						 SYSCFG_USB2PHY2CR_VBUSVLDEXTSEL_MASK |
+ 						 SYSCFG_USB2PHY2CR_VBUSVLDEXT_MASK,
+-						 0);
++						 SYSCFG_USB2PHY2CR_VBUSVLDEXTSEL_MASK);
+ 		} else {
+-			if (submode == USB_ROLE_NONE) {
+-				ret = regmap_update_bits(phy_dev->regmap,
+-							 phy_data->cr_offset,
+-							 SYSCFG_USB2PHY2CR_USB2PHY2CMN_MASK |
+-							 SYSCFG_USB2PHY2CR_VBUSVALID_MASK |
+-							 SYSCFG_USB2PHY2CR_VBUSVLDEXTSEL_MASK |
+-							 SYSCFG_USB2PHY2CR_VBUSVLDEXT_MASK,
+-							 SYSCFG_USB2PHY2CR_VBUSVLDEXTSEL_MASK);
+-			} else {
+-				ret = regmap_update_bits(phy_dev->regmap,
+-							 phy_data->cr_offset,
+-							 SYSCFG_USB2PHY2CR_USB2PHY2CMN_MASK |
+-							 SYSCFG_USB2PHY2CR_VBUSVALID_MASK |
+-							 SYSCFG_USB2PHY2CR_VBUSVLDEXTSEL_MASK |
+-							 SYSCFG_USB2PHY2CR_VBUSVLDEXT_MASK,
+-							 SYSCFG_USB2PHY2CR_VBUSVLDEXTSEL_MASK |
+-							 SYSCFG_USB2PHY2CR_VBUSVLDEXT_MASK);
+-			}
++			ret = regmap_update_bits(phy_dev->regmap,
++						 phy_data->cr_offset,
++						 SYSCFG_USB2PHY2CR_USB2PHY2CMN_MASK |
++						 SYSCFG_USB2PHY2CR_VBUSVALID_MASK |
++						 SYSCFG_USB2PHY2CR_VBUSVLDEXTSEL_MASK |
++						 SYSCFG_USB2PHY2CR_VBUSVLDEXT_MASK,
++						 SYSCFG_USB2PHY2CR_VBUSVLDEXTSEL_MASK |
++						 SYSCFG_USB2PHY2CR_VBUSVLDEXT_MASK);
+ 		}
+ 		if (ret) {
+ 			dev_err(dev, "can't set usb2phycr (%d)\n", ret);
+@@ -612,12 +601,6 @@ static int stm32_usb2phy_probe(struct udevice *dev)
+ 		return -EINVAL;
+ 	}
+ 
+-	if (phy_dev->hw_data->valid_mode != USB2_MODE_HOST_ONLY) {
+-		phy_dev->internal_vbus_comp = ofnode_read_bool(node, "st,internal-vbus-comp");
+-		dev_dbg(dev, "Using usb2phy %s VBUS Comparator\n",
+-			phy_dev->internal_vbus_comp ? "Internal" : "External");
+-	}
+-
+ 	/* Configure phy tuning */
+ 	ret = stm32_usb2phy_tuning(dev, node);
+ 	if (ret) {
+diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
+index 6e79868d0ef..de312656746 100644
+--- a/drivers/pwm/Kconfig
++++ b/drivers/pwm/Kconfig
+@@ -105,6 +105,14 @@ config PWM_TEGRA
+ 	  32KHz clock is supported by the driver but the duty cycle is
+ 	  configurable.
+ 
++config PWM_STM32
++	bool "Enable support for STM32 PWM"
++	depends on DM_PWM && MFD_STM32_TIMERS
++	help
++	  This enables PWM driver for STMicroelectronics STM32 pulse width
++	  modulation. It uses STM32 timer devices that can have up to 4 output
++	  channels, with complementary outputs and configurable polarity.
++
+ config PWM_SUNXI
+ 	bool "Enable support for the Allwinner Sunxi PWM"
+ 	depends on DM_PWM
+diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
+index e4d10c8dc3e..76305b93bc9 100644
+--- a/drivers/pwm/Makefile
++++ b/drivers/pwm/Makefile
+@@ -22,5 +22,6 @@ obj-$(CONFIG_PWM_ROCKCHIP)	+= rk_pwm.o
+ obj-$(CONFIG_PWM_SANDBOX)	+= sandbox_pwm.o
+ obj-$(CONFIG_PWM_SIFIVE)	+= pwm-sifive.o
+ obj-$(CONFIG_PWM_TEGRA)		+= tegra_pwm.o
++obj-$(CONFIG_PWM_STM32)		+= pwm-stm32.o
+ obj-$(CONFIG_PWM_SUNXI)		+= sunxi_pwm.o
+ obj-$(CONFIG_PWM_TI_EHRPWM)	+= pwm-ti-ehrpwm.o
+diff --git a/drivers/pwm/pwm-stm32.c b/drivers/pwm/pwm-stm32.c
+new file mode 100644
+index 00000000000..0e297c68f34
+--- /dev/null
++++ b/drivers/pwm/pwm-stm32.c
+@@ -0,0 +1,203 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Copyright (C) 2024, STMicroelectronics - All Rights Reserved
++ * Author: Cheick Traore <cheick.traore@foss.st.com>
++ *
++ * Originally based on the Linux kernel v6.10 drivers/pwm/pwm-stm32.c.
++ */
++
++#include <common.h>
++#include <div64.h>
++#include <dm.h>
++#include <pwm.h>
++#include <asm/io.h>
++#include <asm/arch/timers.h>
++#include <dm/device_compat.h>
++
++#define NSEC_PER_SEC		1000000000L
++#define CCMR_CHANNEL_SHIFT	8
++#define CCMR_CHANNEL_MASK	0xFF
++
++struct stm32_pwm_priv {
++	bool have_complementary_output;
++	bool invert_polarity;
++};
++
++static u32 active_channels(struct stm32_timers_plat *plat)
++{
++	return readl(plat->base + TIM_CCER) & TIM_CCER_CCXE;
++}
++
++static int stm32_pwm_set_config(struct udevice *dev, uint channel,
++				uint period_ns, uint duty_ns)
++{
++	struct stm32_timers_plat *plat = dev_get_plat(dev_get_parent(dev));
++	struct stm32_timers_priv *priv = dev_get_priv(dev_get_parent(dev));
++	unsigned long long prd, div, dty;
++	unsigned int prescaler = 0;
++	u32 ccmr, mask, shift;
++
++	/*
++	 * Period and prescaler values depends on clock rate
++	 * First we need to find the minimal value for prescaler such that
++	 *
++	 *        period_ns * clkrate
++	 *   ------------------------------ < max_arr + 1
++	 *   NSEC_PER_SEC * (prescaler + 1)
++	 *
++	 * This equation is equivalent to
++	 *
++	 *        period_ns * clkrate
++	 *   ---------------------------- < prescaler + 1
++	 *   NSEC_PER_SEC * (max_arr + 1)
++	 *
++	 * Using integer division and knowing that the right hand side is
++	 * integer, this is further equivalent to
++	 *
++	 *   (period_ns * clkrate) // (NSEC_PER_SEC * (max_arr + 1)) ≤ prescaler
++	 */
++
++	div = (unsigned long long)priv->rate * period_ns;
++	do_div(div, NSEC_PER_SEC);
++	prd = div;
++
++	do_div(div, priv->max_arr + 1);
++	prescaler = div;
++	if (prescaler > MAX_TIM_PSC)
++		return -EINVAL;
++
++	do_div(prd, prescaler + 1);
++	if (!prd)
++		return -EINVAL;
++
++	/*
++	 * All channels share the same prescaler and counter so when two
++	 * channels are active at the same time we can't change them
++	 */
++	if (active_channels(plat) & ~(1 << channel * 4)) {
++		u32 psc, arr;
++
++		psc = readl(plat->base + TIM_PSC);
++		arr = readl(plat->base + TIM_ARR);
++		if (psc != prescaler || arr != prd - 1)
++			return -EBUSY;
++	}
++
++	writel(prescaler, plat->base + TIM_PSC);
++	writel(prd - 1, plat->base + TIM_ARR);
++	setbits_le32(plat->base + TIM_CR1, TIM_CR1_ARPE);
++
++	/* Calculate the duty cycles */
++	dty = prd * duty_ns;
++	do_div(dty, period_ns);
++
++	writel(dty, plat->base + TIM_CCRx(channel + 1));
++
++	/* Configure output mode */
++	shift = (channel & 0x1) * CCMR_CHANNEL_SHIFT;
++	ccmr = (TIM_CCMR_PE | TIM_CCMR_M1) << shift;
++	mask = CCMR_CHANNEL_MASK << shift;
++	if (channel < 2)
++		clrsetbits_le32(plat->base + TIM_CCMR1, mask, ccmr);
++	else
++		clrsetbits_le32(plat->base + TIM_CCMR2, mask, ccmr);
++
++	setbits_le32(plat->base + TIM_BDTR, TIM_BDTR_MOE);
++
++	return 0;
++}
++
++static int stm32_pwm_set_enable(struct udevice *dev, uint channel,
++				bool enable)
++{
++	struct stm32_timers_plat *plat = dev_get_plat(dev_get_parent(dev));
++	struct stm32_pwm_priv *priv = dev_get_priv(dev);
++	u32 mask;
++
++	/* Enable channel */
++	mask = TIM_CCER_CC1E << (channel * 4);
++	if (priv->have_complementary_output)
++		mask |= TIM_CCER_CC1NE << (channel * 4);
++
++	if (enable) {
++		setbits_le32(plat->base + TIM_CCER, mask);
++		/* Make sure that registers are updated */
++		setbits_le32(plat->base + TIM_EGR, TIM_EGR_UG);
++		/* Enable controller */
++		setbits_le32(plat->base + TIM_CR1, TIM_CR1_CEN);
++	} else {
++		clrbits_le32(plat->base + TIM_CCER, mask);
++		/* When all channels are disabled, we can disable the controller */
++		if (!active_channels(plat))
++			clrbits_le32(plat->base + TIM_CR1, TIM_CR1_CEN);
++	}
++
++	return 0;
++}
++
++static int stm32_pwm_set_invert(struct udevice *dev, uint channel,
++				bool polarity)
++{
++	struct stm32_timers_plat *plat = dev_get_plat(dev_get_parent(dev));
++	struct stm32_pwm_priv *priv = dev_get_priv(dev);
++	u32 mask;
++
++	mask = TIM_CCER_CC1P << (channel * 4);
++	if (priv->have_complementary_output)
++		mask |= TIM_CCER_CC1NP << (channel * 4);
++
++	clrsetbits_le32(plat->base + TIM_CCER, mask, polarity ? mask : 0);
++
++	return 0;
++}
++
++static void stm32_pwm_detect_complementary(struct udevice *dev)
++{
++	struct stm32_timers_plat *plat = dev_get_plat(dev_get_parent(dev));
++	struct stm32_pwm_priv *priv = dev_get_priv(dev);
++	u32 ccer;
++
++	/*
++	 * If complementary bit doesn't exist writing 1 will have no
++	 * effect so we can detect it.
++	 */
++	setbits_le32(plat->base + TIM_CCER, TIM_CCER_CC1NE);
++	ccer = readl(plat->base + TIM_CCER);
++	clrbits_le32(plat->base + TIM_CCER, TIM_CCER_CC1NE);
++
++	priv->have_complementary_output = (ccer != 0);
++}
++
++static int stm32_pwm_probe(struct udevice *dev)
++{
++	struct stm32_timers_priv *timer = dev_get_priv(dev_get_parent(dev));
++
++	if (timer->rate > 1000000000) {
++		dev_err(dev, "Clock freq too high (%lu)\n", timer->rate);
++		return -EINVAL;
++	}
++
++	stm32_pwm_detect_complementary(dev);
++
++	return 0;
++}
++
++static const struct pwm_ops stm32_pwm_ops = {
++	.set_config	= stm32_pwm_set_config,
++	.set_enable	= stm32_pwm_set_enable,
++	.set_invert	= stm32_pwm_set_invert,
++};
++
++static const struct udevice_id stm32_pwm_ids[] = {
++	{ .compatible = "st,stm32-pwm" },
++	{ }
++};
++
++U_BOOT_DRIVER(stm32_pwm) = {
++	.name		= "stm32_pwm",
++	.id		= UCLASS_PWM,
++	.of_match	= stm32_pwm_ids,
++	.ops		= &stm32_pwm_ops,
++	.probe          = stm32_pwm_probe,
++	.priv_auto	= sizeof(struct stm32_pwm_priv),
++};
+diff --git a/drivers/usb/dwc3/gadget.c b/drivers/usb/dwc3/gadget.c
+index eb416b832aa..97d5a27928f 100644
+--- a/drivers/usb/dwc3/gadget.c
++++ b/drivers/usb/dwc3/gadget.c
+@@ -2455,6 +2455,10 @@ static irqreturn_t dwc3_process_event_buf(struct dwc3 *dwc, u32 buf)
+ 	evt = dwc->ev_buffs[buf];
+ 	left = evt->count;
+ 
++	/* Invalidate the evt->buf area before reading */
++	invalidate_dcache_range((uintptr_t)evt->buf,
++				(uintptr_t)evt->buf + ROUND(evt->length, CACHELINE_SIZE));
++
+ 	if (!(evt->flags & DWC3_EVENT_PENDING))
+ 		return IRQ_NONE;
+ 
+diff --git a/dts/Makefile b/dts/Makefile
+index efb20fc85de..a0aa38f910c 100644
+--- a/dts/Makefile
++++ b/dts/Makefile
+@@ -45,11 +45,12 @@ arch-dtbs:
+ 
+ PHONY += arch-ext-dtbs
+ arch-ext-dtbs: arch-dtbs
+-	$(Q)test -e $(EXT_DTS) && (\
+-		echo "  EXT_DTS in $(EXT_DTS)";\
++	$(Q)if [ -e $(EXT_DTS) ]; then \
++		echo "  EXT_DTS in $(EXT_DTS)"; \
+ 		$(MAKE) $(build)=$(EXT_DTS) dtbs && \
+-		cp $(EXT_DTS)/*.dtb arch/$(ARCH)/dts/ || \
+-		/bin/true) || /bin/true
++		(cp $(EXT_DTS)/*.dtb arch/$(ARCH)/dts/ || \
++		/bin/true) || /bin/false; \
++	else /bin/true; fi
+ 
+ ifeq ($(CONFIG_SPL_BUILD),y)
+ obj-$(CONFIG_OF_EMBED) := dt-spl.dtb.o
+-- 
+2.25.1
+
