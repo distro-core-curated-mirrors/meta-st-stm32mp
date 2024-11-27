@@ -1,0 +1,1157 @@
+From 2f386f1079c4f0cb9f7f8499f914371e4974e7a3 Mon Sep 17 00:00:00 2001
+From: vermaash <ashish.verma@st.com>
+Date: Tue, 26 Nov 2024 14:03:43 +0530
+Subject: [PATCH] v6.1-stm32mp-r2.1
+
+Change-Id: I263b500d6afa36fcc7ed5642190cabb6b19ad41f
+Signed-off-by: vermaash <ashish.verma@st.com>
+---
+ arch/arm64/boot/dts/st/stm32mp25-pinctrl.dtsi | 65 +++++++++++---
+ arch/arm64/boot/dts/st/stm32mp253.dtsi        | 19 +++-
+ arch/arm64/boot/dts/st/stm32mp257f-dk.dts     | 16 +++-
+ .../fragment-02-defconfig-addons.config       |  1 +
+ drivers/clk/stm32/clk-stm32mp25.c             |  4 +-
+ drivers/i2c/busses/i2c-stm32f7.c              | 13 +--
+ .../st/stm32/stm32-dcmipp/dcmipp-bytecap.c    | 43 +++++++--
+ .../st/stm32/stm32-dcmipp/dcmipp-common.c     | 33 +++++++
+ .../st/stm32/stm32-dcmipp/dcmipp-common.h     | 12 +++
+ .../st/stm32/stm32-dcmipp/dcmipp-isp-params.c |  4 +-
+ .../st/stm32/stm32-dcmipp/dcmipp-pixelcap.c   | 31 ++++++-
+ .../st/stm32/stm32-dcmipp/dcmipp-statcap.c    | 88 ++++++++++++-------
+ drivers/memory/stm32-omi.c                    | 15 ++--
+ drivers/mmc/host/mmci_stm32_sdmmc.c           | 12 ++-
+ drivers/mtd/nand/raw/stm32_fmc2_nand.c        | 28 ++----
+ drivers/pci/controller/dwc/pcie-stm32-ep.c    | 13 ++-
+ drivers/spi/spi-stm32-ospi.c                  | 18 ++--
+ drivers/spi/spi-stm32-qspi.c                  | 12 ++-
+ drivers/spi/spi-stm32.c                       |  3 +-
+ drivers/spi/spi.c                             |  6 +-
+ include/linux/spi/spi.h                       |  5 +-
+ 21 files changed, 315 insertions(+), 126 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/st/stm32mp25-pinctrl.dtsi b/arch/arm64/boot/dts/st/stm32mp25-pinctrl.dtsi
+index b97e10591a6c..a6ed7566aa4c 100644
+--- a/arch/arm64/boot/dts/st/stm32mp25-pinctrl.dtsi
++++ b/arch/arm64/boot/dts/st/stm32mp25-pinctrl.dtsi
+@@ -535,6 +535,25 @@ pins2 {
+ 		};
+ 	};
+ 
++	sdmmc1_b4_pins_b: sdmmc1-b4-1 {
++		pins1 {
++			pinmux = <STM32_PINMUX('E', 4, AF10)>, /* SDMMC1_D0 */
++				 <STM32_PINMUX('E', 5, AF10)>, /* SDMMC1_D1 */
++				 <STM32_PINMUX('E', 0, AF10)>, /* SDMMC1_D2 */
++				 <STM32_PINMUX('E', 1, AF10)>, /* SDMMC1_D3 */
++				 <STM32_PINMUX('E', 2, AF10)>; /* SDMMC1_CMD */
++			slew-rate = <1>;
++			drive-push-pull;
++			bias-disable;
++		};
++		pins2 {
++			pinmux = <STM32_PINMUX('E', 3, AF10)>; /* SDMMC1_CK */
++			slew-rate = <2>;
++			drive-push-pull;
++			bias-disable;
++		};
++	};
++
+ 	sdmmc1_b4_od_pins_a: sdmmc1-b4-od-0 {
+ 		pins1 {
+ 			pinmux = <STM32_PINMUX('E', 4, AF10)>, /* SDMMC1_D0 */
+@@ -559,6 +578,30 @@ pins3 {
+ 		};
+ 	};
+ 
++	sdmmc1_b4_od_pins_b: sdmmc1-b4-od-1 {
++		pins1 {
++			pinmux = <STM32_PINMUX('E', 4, AF10)>, /* SDMMC1_D0 */
++				 <STM32_PINMUX('E', 5, AF10)>, /* SDMMC1_D1 */
++				 <STM32_PINMUX('E', 0, AF10)>, /* SDMMC1_D2 */
++				 <STM32_PINMUX('E', 1, AF10)>; /* SDMMC1_D3 */
++			slew-rate = <1>;
++			drive-push-pull;
++			bias-disable;
++		};
++		pins2 {
++			pinmux = <STM32_PINMUX('E', 3, AF10)>; /* SDMMC1_CK */
++			slew-rate = <2>;
++			drive-push-pull;
++			bias-disable;
++		};
++		pins3 {
++			pinmux = <STM32_PINMUX('E', 2, AF10)>; /* SDMMC1_CMD */
++			slew-rate = <1>;
++			drive-open-drain;
++			bias-disable;
++		};
++	};
++
+ 	sdmmc1_b4_sleep_pins_a: sdmmc1-b4-sleep-0 {
+ 		pins {
+ 			pinmux = <STM32_PINMUX('E', 4, ANALOG)>, /* SDMMC1_D0 */
+@@ -577,13 +620,13 @@ pins1 {
+ 				 <STM32_PINMUX('E', 8, AF12)>, /* SDMMC2_D2 */
+ 				 <STM32_PINMUX('E', 12, AF12)>, /* SDMMC2_D3 */
+ 				 <STM32_PINMUX('E', 15, AF12)>; /* SDMMC2_CMD */
+-			slew-rate = <2>;
++			slew-rate = <1>;
+ 			drive-push-pull;
+ 			bias-pull-up;
+ 		};
+ 		pins2 {
+ 			pinmux = <STM32_PINMUX('E', 14, AF12)>; /* SDMMC2_CK */
+-			slew-rate = <3>;
++			slew-rate = <2>;
+ 			drive-push-pull;
+ 			bias-pull-up;
+ 		};
+@@ -595,19 +638,19 @@ pins1 {
+ 				 <STM32_PINMUX('E', 11, AF12)>, /* SDMMC2_D1 */
+ 				 <STM32_PINMUX('E', 8, AF12)>, /* SDMMC2_D2 */
+ 				 <STM32_PINMUX('E', 12, AF12)>; /* SDMMC2_D3 */
+-			slew-rate = <2>;
++			slew-rate = <1>;
+ 			drive-push-pull;
+ 			bias-pull-up;
+ 		};
+ 		pins2 {
+ 			pinmux = <STM32_PINMUX('E', 14, AF12)>; /* SDMMC2_CK */
+-			slew-rate = <3>;
++			slew-rate = <2>;
+ 			drive-push-pull;
+ 			bias-pull-up;
+ 		};
+ 		pins3 {
+ 			pinmux = <STM32_PINMUX('E', 15, AF12)>; /* SDMMC2_CMD */
+-			slew-rate = <2>;
++			slew-rate = <1>;
+ 			drive-open-drain;
+ 			bias-pull-up;
+ 		};
+@@ -630,7 +673,7 @@ pins {
+ 				 <STM32_PINMUX('E', 9, AF12)>, /* SDMMC2_D5 */
+ 				 <STM32_PINMUX('E', 6, AF12)>, /* SDMMC2_D6 */
+ 				 <STM32_PINMUX('E', 7, AF12)>; /* SDMMC2_D7 */
+-			slew-rate = <2>;
++			slew-rate = <1>;
+ 			drive-push-pull;
+ 			bias-pull-up;
+ 		};
+@@ -652,13 +695,13 @@ pins1 {
+ 				 <STM32_PINMUX('B', 12, AF10)>, /* SDMMC3_D2 */
+ 				 <STM32_PINMUX('I', 11, AF10)>, /* SDMMC3_D3 */
+ 				 <STM32_PINMUX('D', 12, AF10)>; /* SDMMC3_CMD */
+-			slew-rate = <2>;
++			slew-rate = <0>;
+ 			drive-push-pull;
+ 			bias-pull-up;
+ 		};
+ 		pins2 {
+ 			pinmux = <STM32_PINMUX('B', 13, AF10)>; /* SDMMC3_CK */
+-			slew-rate = <3>;
++			slew-rate = <1>;
+ 			drive-push-pull;
+ 			bias-pull-up;
+ 		};
+@@ -670,19 +713,19 @@ pins1 {
+ 				 <STM32_PINMUX('D', 13, AF10)>, /* SDMMC3_D1 */
+ 				 <STM32_PINMUX('B', 12, AF10)>, /* SDMMC3_D2 */
+ 				 <STM32_PINMUX('I', 11, AF10)>; /* SDMMC3_D3 */
+-			slew-rate = <2>;
++			slew-rate = <0>;
+ 			drive-push-pull;
+ 			bias-pull-up;
+ 		};
+ 		pins2 {
+ 			pinmux = <STM32_PINMUX('B', 13, AF10)>; /* SDMMC3_CK */
+-			slew-rate = <3>;
++			slew-rate = <1>;
+ 			drive-push-pull;
+ 			bias-pull-up;
+ 		};
+ 		pins3 {
+ 			pinmux = <STM32_PINMUX('D', 12, AF10)>; /* SDMMC3_CMD */
+-			slew-rate = <2>;
++			slew-rate = <0>;
+ 			drive-open-drain;
+ 			bias-pull-up;
+ 		};
+diff --git a/arch/arm64/boot/dts/st/stm32mp253.dtsi b/arch/arm64/boot/dts/st/stm32mp253.dtsi
+index 4e9568a56a23..826d13f0acf6 100644
+--- a/arch/arm64/boot/dts/st/stm32mp253.dtsi
++++ b/arch/arm64/boot/dts/st/stm32mp253.dtsi
+@@ -44,7 +44,7 @@ soc@0 {
+ 		rifsc: rifsc@42080000 {
+ 			m_can1: can@402d0000 {
+ 				compatible = "bosch,m_can";
+-				reg = <0x402d0000 0x400>, <0x40310000 0x1400>;
++				reg = <0x402d0000 0x400>, <0x40310000 0xd50>;
+ 				reg-names = "m_can", "message_ram";
+ 				interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>,
+ 					     <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
+@@ -57,6 +57,21 @@ m_can1: can@402d0000 {
+ 				status = "disabled";
+ 			};
+ 
++			m_can2: can@402e0000 {
++				compatible = "bosch,m_can";
++				reg = <0x402e0000 0x400>, <0x40310000 0x1aa0>;
++				reg-names = "m_can", "message_ram";
++				interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 95 IRQ_TYPE_LEVEL_HIGH>;
++				interrupt-names = "int0", "int1";
++				clocks = <&rcc CK_BUS_FDCAN>, <&rcc CK_KER_FDCAN>;
++				clock-names = "hclk", "cclk";
++				bosch,mram-cfg = <0xd50 0 0 32 0 0 2 2>;
++				feature-domains = <&rifsc STM32MP25_RIFSC_FDCAN_ID>;
++				power-domains = <&CLUSTER_PD>;
++				status = "disabled";
++			};
++
+ 			m_can3: can@402f0000 {
+ 				compatible = "bosch,m_can";
+ 				reg = <0x402f0000 0x400>, <0x40310000 0x2800>;
+@@ -66,7 +81,7 @@ m_can3: can@402f0000 {
+ 				interrupt-names = "int0", "int1";
+ 				clocks = <&rcc CK_BUS_FDCAN>, <&rcc CK_KER_FDCAN>;
+ 				clock-names = "hclk", "cclk";
+-				bosch,mram-cfg = <0x1400 0 0 32 0 0 2 2>;
++				bosch,mram-cfg = <0x1aa0 0 0 32 0 0 2 2>;
+ 				feature-domains = <&rifsc STM32MP25_RIFSC_FDCAN_ID>;
+ 				power-domains = <&CLUSTER_PD>;
+ 				status = "disabled";
+diff --git a/arch/arm64/boot/dts/st/stm32mp257f-dk.dts b/arch/arm64/boot/dts/st/stm32mp257f-dk.dts
+index 0345d346eff8..4cb80834cc18 100644
+--- a/arch/arm64/boot/dts/st/stm32mp257f-dk.dts
++++ b/arch/arm64/boot/dts/st/stm32mp257f-dk.dts
+@@ -620,8 +620,8 @@ scmi_vdd_sdcard: regulator@23 {
+ 
+ &sdmmc1 {
+ 	pinctrl-names = "default", "opendrain", "sleep";
+-	pinctrl-0 = <&sdmmc1_b4_pins_a>;
+-	pinctrl-1 = <&sdmmc1_b4_od_pins_a>;
++	pinctrl-0 = <&sdmmc1_b4_pins_b>;
++	pinctrl-1 = <&sdmmc1_b4_od_pins_b>;
+ 	pinctrl-2 = <&sdmmc1_b4_sleep_pins_a>;
+ 	cd-gpios = <&gpiod 3 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+ 	disable-wp;
+@@ -650,7 +650,6 @@ &sdmmc2 {
+ 	vmmc-supply = <&scmi_vdd_emmc>;
+ 	vqmmc-supply = <&scmi_vddio2>;
+ 	mmc-ddr-1_8v;
+-	mmc-hs200-1_8v;
+ 	status = "okay";
+ };
+ 
+@@ -733,6 +732,17 @@ &usb2_phy2 {
+ &usbh {
+ 	status = "okay";
+ 
++	usbh_ehci: usb@482f0000 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		/* onboard HUB */
++		hub@1 {
++			compatible = "usb424,2514";
++			reg = <1>;
++			vdd-supply = <&scmi_v3v3>;
++		};
++	};
++
+ 	usbh_ohci: usb@482e0000 {
+ 		status = "disabled";
+ 	};
+diff --git a/arch/arm64/configs/fragment-02-defconfig-addons.config b/arch/arm64/configs/fragment-02-defconfig-addons.config
+index 00d70ac85b75..3381b48e87ad 100644
+--- a/arch/arm64/configs/fragment-02-defconfig-addons.config
++++ b/arch/arm64/configs/fragment-02-defconfig-addons.config
+@@ -115,6 +115,7 @@ CONFIG_TOUCHSCREEN_ILI210X=y
+ CONFIG_TYPEC_UCSI=m
+ CONFIG_UBIFS_FS=y
+ CONFIG_UCSI_STM32G0=m
++CONFIG_USB_CONFIGFS_F_UVC=y
+ CONFIG_USB_DWC3_STM32=y
+ CONFIG_USB_HIDDEV=y
+ CONFIG_USB_ONBOARD_HUB=y
+diff --git a/drivers/clk/stm32/clk-stm32mp25.c b/drivers/clk/stm32/clk-stm32mp25.c
+index 72d55012a3cf..5185af33ee0c 100644
+--- a/drivers/clk/stm32/clk-stm32mp25.c
++++ b/drivers/clk/stm32/clk-stm32mp25.c
+@@ -1186,8 +1186,8 @@ static const struct clock_config stm32mp25_clock_cfg[] = {
+ 	STM32_COMPOSITE_CFG(CK_KER_ADC12, ck_ker_adc12, SEC_RIFSC(ADC12)),
+ 	STM32_COMPOSITE_CFG(CK_KER_ADC3, ck_ker_adc3, SEC_RIFSC(ADC3)),
+ 	STM32_COMPOSITE_CFG(CK_KER_USB2PHY1, ck_ker_usb2phy1, SEC_RIFSC(USBH)),
+-	STM32_GATE_CFG(CK_KER_USB2PHY2, ck_ker_usb2phy2, SEC_RIFSC(USBH)),
+-	STM32_COMPOSITE_CFG(CK_KER_USB2PHY2EN, ck_ker_usb2phy2_en, SEC_RIFSC(USBH)),
++	STM32_GATE_CFG(CK_KER_USB2PHY2, ck_ker_usb2phy2, SEC_RIFSC(USB3DR)),
++	STM32_COMPOSITE_CFG(CK_KER_USB2PHY2EN, ck_ker_usb2phy2_en, SEC_RIFSC(USB3DR)),
+ 	STM32_COMPOSITE_CFG(CK_KER_USB3PCIEPHY, ck_ker_usb3pciephy, SEC_RIFSC(USB3DR)),
+ 	STM32_COMPOSITE_CFG(CK_KER_DSIBLANE, clk_lanebyte, SEC_RIFSC(DSI_CMN)),
+ 	STM32_COMPOSITE_CFG(CK_KER_DSIPHY, clk_phy_dsi, SEC_RIFSC(DSI_CMN)),
+diff --git a/drivers/i2c/busses/i2c-stm32f7.c b/drivers/i2c/busses/i2c-stm32f7.c
+index c9109cb82283..de0251c039c5 100644
+--- a/drivers/i2c/busses/i2c-stm32f7.c
++++ b/drivers/i2c/busses/i2c-stm32f7.c
+@@ -180,12 +180,7 @@ enum {
+ #define STM32F7_SCLH_MAX			BIT(8)
+ #define STM32F7_SCLL_MAX			BIT(8)
+ 
+-/*
+- * This autosuspend delay should be long enough so that a clk client device performing i2c
+- * transfer within its prepare_lock protected handler should be able to perform the whole
+- * handling without having the autosuspend to try to suspend the i2c adapter
+- */
+-#define STM32F7_AUTOSUSPEND_DELAY		HZ
++#define STM32F7_AUTOSUSPEND_DELAY		(HZ / 100)
+ 
+ /**
+  * struct stm32f7_i2c_regs - i2c f7 registers backup
+@@ -2415,7 +2410,7 @@ static int __maybe_unused stm32f7_i2c_runtime_suspend(struct device *dev)
+ 	stm32f7_i2c_regs_backup(i2c_dev);
+ 
+ 	if (!stm32f7_i2c_is_slave_registered(i2c_dev))
+-		clk_disable_unprepare(i2c_dev->clk);
++		clk_disable(i2c_dev->clk);
+ 
+ 	return 0;
+ }
+@@ -2426,9 +2421,9 @@ static int __maybe_unused stm32f7_i2c_runtime_resume(struct device *dev)
+ 	int ret;
+ 
+ 	if (!stm32f7_i2c_is_slave_registered(i2c_dev)) {
+-		ret = clk_prepare_enable(i2c_dev->clk);
++		ret = clk_enable(i2c_dev->clk);
+ 		if (ret) {
+-			dev_err(dev, "failed to prepare_enable clock\n");
++			dev_err(dev, "failed to enable clock\n");
+ 			return ret;
+ 		}
+ 	}
+diff --git a/drivers/media/platform/st/stm32/stm32-dcmipp/dcmipp-bytecap.c b/drivers/media/platform/st/stm32/stm32-dcmipp/dcmipp-bytecap.c
+index decc1fcc7793..0f4908b8d843 100644
+--- a/drivers/media/platform/st/stm32/stm32-dcmipp/dcmipp-bytecap.c
++++ b/drivers/media/platform/st/stm32/stm32-dcmipp/dcmipp-bytecap.c
+@@ -165,6 +165,9 @@ struct dcmipp_bytecap_device {
+ 	int it_count;
+ 	int underrun_count;
+ 	int nactive_count;
++
++	u32 vsync_frame_refresh_cnt;
++	u32 frame_skip_ratio;
+ };
+ 
+ static const struct v4l2_pix_format fmt_default = {
+@@ -424,6 +427,20 @@ static int dcmipp_pipeline_s_stream(struct dcmipp_bytecap_device *vcap,
+ 
+ 	mutex_lock(&mdev->graph_mutex);
+ 
++	/* Get the pad connected to PAD 0 of the video capture device */
++	pad = media_pad_remote_pad_first(&entity->pads[0]);
++	if (!pad || !is_media_entity_v4l2_subdev(pad->entity)) {
++		ret = -EINVAL;
++		goto out;
++	}
++
++	/* Get the postproc subdev in order to get frame skip ratio*/
++	subdev = media_entity_to_v4l2_subdev(pad->entity);
++
++	ret = dcmipp_get_frame_skip_rate(subdev, &vcap->frame_skip_ratio);
++	if (ret < 0)
++		goto out;
++
+ 	/* Start/stop all entities within pipeline */
+ 	while (1) {
+ 		pad = &entity->pads[0];
+@@ -475,7 +492,7 @@ static int dcmipp_pipeline_s_stream(struct dcmipp_bytecap_device *vcap,
+ out:
+ 	mutex_unlock(&mdev->graph_mutex);
+ 
+-	return 0;
++	return ret;
+ }
+ 
+ static void dcmipp_start_capture(struct dcmipp_bytecap_device *vcap,
+@@ -489,6 +506,9 @@ static void dcmipp_start_capture(struct dcmipp_bytecap_device *vcap,
+ 	reg_write(vcap, DCMIPP_P0DCLMTR, DCMIPP_P0DCLMTR_ENABLE |
+ 		  ((buf->size / 4) & DCMIPP_P0DCLMTR_LIMIT_MASK));
+ 
++	/* It takes 1 VSYNCs to actually start */
++	vcap->vsync_frame_refresh_cnt = 1;
++
+ 	/* Capture request */
+ 	reg_set(vcap, DCMIPP_P0FCTCR, DCMIPP_P0FCTCR_CPTREQ);
+ }
+@@ -926,15 +946,20 @@ static irqreturn_t dcmipp_bytecap_irq_thread(int irq, void *arg)
+ 		}
+ 
+ 		/*
+-		 * On VSYNC, the previously set next buffer is going to become active thanks to
+-		 * the shadowing mechanism of the DCMIPP. In most of the cases, since a FRAMEEND
+-		 * has already come, pointer next is NULL since active is reset during the
+-		 * FRAMEEND handling. However, in case of framerate adjustment, there are more
+-		 * VSYNC than FRAMEEND. Thus we recycle the active (but not used) buffer and put it
+-		 * back into next.
++		 * On VSYNC, the previously set next buffer is going to become
++		 * active thanks to the shadowing mechanism of the DCMIPP. In
++		 * most of the cases, since a FRAMEEND has already come,
++		 * pointer next is NULL since active is reset during the
++		 * FRAMEEND handling. However, in case of framerate adjustment,
++		 * there are more VSYNC than FRAMEEND. To tackle with those
++		 * cases, the driver needs to count vsync in order to apply
++		 * updates only when really necessary.
+ 		 */
+-		swap(vcap->active, vcap->next);
+-		dcmipp_bytecap_set_next_frame_or_stop(vcap);
++		if (--vcap->vsync_frame_refresh_cnt == 0) {
++			vcap->vsync_frame_refresh_cnt = vcap->frame_skip_ratio;
++			swap(vcap->active, vcap->next);
++			dcmipp_bytecap_set_next_frame_or_stop(vcap);
++		}
+ 	}
+ 
+ out:
+diff --git a/drivers/media/platform/st/stm32/stm32-dcmipp/dcmipp-common.c b/drivers/media/platform/st/stm32/stm32-dcmipp/dcmipp-common.c
+index 45995563c64b..01a5c5aafb9a 100644
+--- a/drivers/media/platform/st/stm32/stm32-dcmipp/dcmipp-common.c
++++ b/drivers/media/platform/st/stm32/stm32-dcmipp/dcmipp-common.c
+@@ -111,3 +111,36 @@ void dcmipp_ent_sd_unregister(struct dcmipp_ent_device *ved, struct v4l2_subdev
+ 	v4l2_device_unregister_subdev(sd);
+ 	dcmipp_pads_cleanup(ved->pads);
+ }
++
++int dcmipp_get_frame_skip_rate(struct v4l2_subdev *source,
++			       u32 *frame_skip_rate)
++{
++	struct v4l2_subdev_frame_interval sink_fi = { .pad = 0, };
++	struct v4l2_subdev_frame_interval source_fi = { .pad = 1, };
++	u32 ratio = 1;
++	int ret;
++
++	/*
++	 * Retrieve the frame rate adjustment info from postproc subdev
++	 * if frame_interval are not available, rate will be 1
++	 */
++	ret = v4l2_subdev_call(source, video, g_frame_interval, &sink_fi);
++	if (ret < 0)
++		goto end;
++
++	ret = v4l2_subdev_call(source, video, g_frame_interval, &source_fi);
++	if (ret < 0)
++		goto end;
++
++	if (!sink_fi.interval.numerator || !sink_fi.interval.denominator ||
++	    !source_fi.interval.numerator || !source_fi.interval.denominator)
++		goto end;
++
++	ratio = (sink_fi.interval.denominator * source_fi.interval.numerator) /
++		(sink_fi.interval.numerator * source_fi.interval.denominator);
++
++end:
++	*frame_skip_rate = ratio;
++
++	return 0;
++}
+diff --git a/drivers/media/platform/st/stm32/stm32-dcmipp/dcmipp-common.h b/drivers/media/platform/st/stm32/stm32-dcmipp/dcmipp-common.h
+index 5bcd8c79a668..445db5f3ce0e 100644
+--- a/drivers/media/platform/st/stm32/stm32-dcmipp/dcmipp-common.h
++++ b/drivers/media/platform/st/stm32/stm32-dcmipp/dcmipp-common.h
+@@ -174,6 +174,18 @@ void dcmipp_ent_sd_unregister(struct dcmipp_ent_device *ved,
+  */
+ int dcmipp_link_validate(struct media_link *link);
+ 
++/**
++ * dcmipp_get_frame_skip_rate - compute skip ratio
++ *
++ * @source:	v4l2_subdev device
++ * @frame_skip_rate:	pointer to return skip ratio
++ *
++ * Helper function to compute the skip ratio by comparing
++ * the sink and source pad frame_interval
++ */
++int dcmipp_get_frame_skip_rate(struct v4l2_subdev *source,
++			       u32 *frame_skip_rate);
++
+ #define reg_write(device, reg, val) \
+ 	(reg_write_dbg((device)->dev, #reg, (device)->regs, (reg), (val)))
+ #define reg_read(device, reg) \
+diff --git a/drivers/media/platform/st/stm32/stm32-dcmipp/dcmipp-isp-params.c b/drivers/media/platform/st/stm32/stm32-dcmipp/dcmipp-isp-params.c
+index 623403c6cc80..75459b7971be 100644
+--- a/drivers/media/platform/st/stm32/stm32-dcmipp/dcmipp-isp-params.c
++++ b/drivers/media/platform/st/stm32/stm32-dcmipp/dcmipp-isp-params.c
+@@ -26,6 +26,7 @@
+ #define DCMIPP_ISP_PARAMS_DRV_NAME "dcmipp-isp-params"
+ 
+ #define DCMIPP_CMSR2_P1VSYNCF BIT(18)
++#define DCMIPP_CMSR2_P2VSYNCF BIT(26)
+ 
+ struct dcmipp_buf {
+ 	struct vb2_v4l2_buffer	vb;
+@@ -522,7 +523,8 @@ static irqreturn_t dcmipp_isp_params_irq_thread(int irq, void *arg)
+ 	struct dcmipp_buf *cur_buf = NULL;
+ 
+ 	/* We are only interested in VSYNC interrupts */
+-	if (!(ved->cmsr2 & DCMIPP_CMSR2_P1VSYNCF))
++	if (!(ved->cmsr2 & DCMIPP_CMSR2_P1VSYNCF) &&
++	    !(ved->cmsr2 & DCMIPP_CMSR2_P2VSYNCF))
+ 		return IRQ_HANDLED;
+ 
+ 	spin_lock_irq(&vout->irqlock);
+diff --git a/drivers/media/platform/st/stm32/stm32-dcmipp/dcmipp-pixelcap.c b/drivers/media/platform/st/stm32/stm32-dcmipp/dcmipp-pixelcap.c
+index b5bb3009a197..42ed2e7b6f9c 100644
+--- a/drivers/media/platform/st/stm32/stm32-dcmipp/dcmipp-pixelcap.c
++++ b/drivers/media/platform/st/stm32/stm32-dcmipp/dcmipp-pixelcap.c
+@@ -199,6 +199,9 @@ struct dcmipp_pixelcap_device {
+ 	int it_count;
+ 	int underrun_count;
+ 	int nactive_count;
++
++	u32 vsync_frame_refresh_cnt;
++	u32 frame_skip_ratio;
+ };
+ 
+ static const struct v4l2_pix_format fmt_default = {
+@@ -514,6 +517,20 @@ static int dcmipp_pipeline_s_stream(struct dcmipp_pixelcap_device *vcap,
+ 
+ 	mutex_lock(&mdev->graph_mutex);
+ 
++	/* Get the pad connected to PAD 0 of the video capture device */
++	pad = media_pad_remote_pad_first(&entity->pads[0]);
++	if (!pad || !is_media_entity_v4l2_subdev(pad->entity)) {
++		ret = -EINVAL;
++		goto out;
++	}
++
++	/* Get the postproc subdev in order to get frame skip ratio*/
++	subdev = media_entity_to_v4l2_subdev(pad->entity);
++
++	ret = dcmipp_get_frame_skip_rate(subdev, &vcap->frame_skip_ratio);
++	if (ret < 0)
++		goto out;
++
+ 	/* Start/stop all entities within pipeline */
+ 	while (1) {
+ 		pad = &entity->pads[0];
+@@ -588,6 +605,9 @@ static int dcmipp_start_capture(struct dcmipp_pixelcap_device *vcap,
+ 	if (buf->paddrs[2])
+ 		reg_write(vcap, DCMIPP_P1PPM2AR1, buf->paddrs[2]);
+ 
++	/* It takes 1 VSYNCs to actually start */
++	vcap->vsync_frame_refresh_cnt = 1;
++
+ 	/* Capture request */
+ 	reg_set(vcap, DCMIPP_PxFCTCR(vcap->pipe_id), DCMIPP_PxFCTCR_CPTREQ);
+ 
+@@ -1035,11 +1055,14 @@ static irqreturn_t dcmipp_pixelcap_irq_thread(int irq, void *arg)
+ 		 * the shadowing mechanism of the DCMIPP. In most of the cases, since a FRAMEEND
+ 		 * has already come, pointer next is NULL since active is reset during the
+ 		 * FRAMEEND handling. However, in case of framerate adjustment, there are more
+-		 * VSYNC than FRAMEEND. Thus we recycle the active (but not used) buffer and put it
+-		 * back into next.
++		 * VSYNC than FRAMEEND. To tackle with those cases, the driver needs to count
++		 * vsync in order to apply updates only when really necessary.
+ 		 */
+-		swap(vcap->active, vcap->next);
+-		dcmipp_pixelcap_set_next_frame_or_stop(vcap);
++		if (--vcap->vsync_frame_refresh_cnt == 0) {
++			vcap->vsync_frame_refresh_cnt = vcap->frame_skip_ratio;
++			swap(vcap->active, vcap->next);
++			dcmipp_pixelcap_set_next_frame_or_stop(vcap);
++		}
+ 	}
+ 
+ out:
+diff --git a/drivers/media/platform/st/stm32/stm32-dcmipp/dcmipp-statcap.c b/drivers/media/platform/st/stm32/stm32-dcmipp/dcmipp-statcap.c
+index a420e429fe0d..f4c5c356a70e 100644
+--- a/drivers/media/platform/st/stm32/stm32-dcmipp/dcmipp-statcap.c
++++ b/drivers/media/platform/st/stm32/stm32-dcmipp/dcmipp-statcap.c
+@@ -28,6 +28,7 @@
+ #define DCMIPP_STATCAP_DRV_NAME "dcmipp-statcap"
+ 
+ #define DCMIPP_CMSR2_P1VSYNCF BIT(18)
++#define DCMIPP_CMSR2_P2VSYNCF BIT(26)
+ 
+ #define DCMIPP_P1BPRSR (0x828)
+ #define DCMIPP_P1BPRSR_BADCNT_MASK GENMASK(11, 0)
+@@ -79,7 +80,8 @@ enum stat_capture_state {
+ 	PHY_BIN_2_SHA_BIN_3,	/* Shadow: BIN_3, Physical: BIN_2 */
+ 	PHY_BIN_3_SHA_AV_RGB,	/* Shadow: AVERAGE (RGB), Physical: BIN_3 */
+ 	/* Average pre-post profile */
+-	PHY_AV_RGB_SHA_AV_RGB,	/* Shadow: AVERAGE (RGB), Physical: AVERAGE (RGB) */
++	PHY_AV_RGB,	/* Shadow: AVERAGE (RGB), Physical: AVERAGE (RGB) */
++	AV_READ,	/* Capturing AVERAGE / Accumulators with valid AVERAGE */
+ };
+ 
+ enum component {
+@@ -108,6 +110,8 @@ struct dcmipp_statcap_device {
+ 	enum v4l2_isp_stat_avg_filter avg_filter;
+ 	enum v4l2_isp_stat_bin_comp bin_comp;
+ 	enum v4l2_isp_stat_profile stat_profile;
++	u32 stat_location;
++	bool stat_ready;
+ 	struct v4l2_subdev *s_subdev;
+ 
+ 	/*
+@@ -554,7 +558,7 @@ static int dcmipp_statcap_s_ctrl(struct v4l2_ctrl *ctrl)
+ 		     !region->left[0] && !region->top[0])) {
+ 			spin_lock_irq(&vcap->irqlock);
+ 			vcap->stat_region.width = sel.r.width;
+-			vcap->stat_region.height = sel.r.width;
++			vcap->stat_region.height = sel.r.height;
+ 			reg_clear(vcap, DCMIPP_P1STSZR, DCMIPP_P1STSZR_ENABLE);
+ 			spin_unlock_irq(&vcap->irqlock);
+ 			break;
+@@ -585,16 +589,26 @@ static int dcmipp_statcap_s_ctrl(struct v4l2_ctrl *ctrl)
+ 			(region->width[0] << DCMIPP_P1STSZR_HSIZE_SHIFT) |
+ 			(region->height[0] << DCMIPP_P1STSZR_VSIZE_SHIFT) |
+ 			DCMIPP_P1STSZR_ENABLE);
++		vcap->capture_state = COLD_START;
+ 		spin_unlock_irq(&vcap->irqlock);
+ 		break;
+ 	case V4L2_CID_ISP_STAT_AVG_FILTER:
++		spin_lock_irq(&vcap->irqlock);
+ 		vcap->avg_filter = ctrl->val;
++		vcap->capture_state = COLD_START;
++		spin_unlock_irq(&vcap->irqlock);
+ 		break;
+ 	case V4L2_CID_ISP_STAT_BIN_COMP:
++		spin_lock_irq(&vcap->irqlock);
+ 		vcap->bin_comp = ctrl->val;
++		vcap->capture_state = COLD_START;
++		spin_unlock_irq(&vcap->irqlock);
+ 		break;
+ 	case V4L2_CID_ISP_STAT_PROFILE:
++		spin_lock_irq(&vcap->irqlock);
+ 		vcap->stat_profile = ctrl->val;
++		vcap->capture_state = COLD_START;
++		spin_unlock_irq(&vcap->irqlock);
+ 		break;
+ 	}
+ 
+@@ -632,7 +646,7 @@ static const struct v4l2_ctrl_config dcmipp_statcap_ctrls[] = {
+ 		.min	= 0,
+ 		.max	= V4L2_STAT_BIN_COMP_L,
+ 		.step	= 1,
+-		.def	= 0,
++		.def	= V4L2_STAT_BIN_COMP_L,
+ 		.flags	= 0,
+ 	}, {
+ 		.ops	= &dcmipp_statcap_ctrl_ops,
+@@ -696,12 +710,11 @@ static u32 dcmipp_statcap_get_src(u32 location,
+ 	return (location << DCMIPP_P1STXCR_SRC_LOC_SHIFT) | (comp << DCMIPP_P1STXCR_SRC_COMP_SHIFT);
+ }
+ 
+-static void dcmipp_statcap_read_avg_stats(struct dcmipp_statcap_device *vcap,
+-					  u32 location)
++static void dcmipp_statcap_read_avg_stats(struct dcmipp_statcap_device *vcap)
+ {
+ 	struct stm32_dcmipp_stat_avr_bins *avr_bins =
+-		location == DCMIPP_P1STXCR_SRC_LOC_PRE ? &vcap->local_buf.pre :
+-							 &vcap->local_buf.post;
++		vcap->stat_location == DCMIPP_P1STXCR_SRC_LOC_PRE ? &vcap->local_buf.pre :
++								    &vcap->local_buf.post;
+ 	int i;
+ 
+ 	for (i = 0; i < ARRAY_SIZE(vcap->local_buf.pre.average_RGB); i++) {
+@@ -710,7 +723,7 @@ static void dcmipp_statcap_read_avg_stats(struct dcmipp_statcap_device *vcap,
+ 		avr_bins->average_RGB[i] <<= 8;
+ 
+ 		/* Depending on the position & component, need to adjust in case of Bayer */
+-		if (location == DCMIPP_P1STXCR_SRC_LOC_PRE &&
++		if (vcap->stat_location == DCMIPP_P1STXCR_SRC_LOC_PRE &&
+ 		    vcap->frame_format >= MEDIA_BUS_FMT_SBGGR8_1X8 &&
+ 		    vcap->frame_format <= MEDIA_BUS_FMT_SRGGB16_1X16) {
+ 			/* raw bayer: RGB component not present for all pixels */
+@@ -730,11 +743,9 @@ static irqreturn_t dcmipp_statcap_irq_thread(int irq, void *arg)
+ 	struct dcmipp_statcap_device *vcap =
+ 			container_of(arg, struct dcmipp_statcap_device, ved);
+ 	struct dcmipp_ent_device *ved = arg;
+-	static u32 location = DCMIPP_P1STXCR_SRC_LOC_PRE;
+ 	struct stm32_dcmipp_stat_avr_bins *avr_bins =
+-		location == DCMIPP_P1STXCR_SRC_LOC_PRE ? &vcap->local_buf.pre :
+-							 &vcap->local_buf.post;
+-	static bool stat_ready;
++		vcap->stat_location == DCMIPP_P1STXCR_SRC_LOC_PRE ? &vcap->local_buf.pre :
++								    &vcap->local_buf.post;
+ 	int i;
+ 
+ 	/* We only to do things if we are streaming */
+@@ -742,7 +753,8 @@ static irqreturn_t dcmipp_statcap_irq_thread(int irq, void *arg)
+ 		return IRQ_HANDLED;
+ 
+ 	/* We are only interested in VSYNC interrupts */
+-	if (!(ved->cmsr2 & DCMIPP_CMSR2_P1VSYNCF))
++	if (!(ved->cmsr2 & DCMIPP_CMSR2_P1VSYNCF) &&
++	    !(ved->cmsr2 & DCMIPP_CMSR2_P2VSYNCF))
+ 		return IRQ_HANDLED;
+ 
+ 	spin_lock_irq(&vcap->irqlock);
+@@ -762,15 +774,16 @@ static irqreturn_t dcmipp_statcap_irq_thread(int irq, void *arg)
+ 	 */
+ 	switch (vcap->capture_state) {
+ 	case COLD_START:
+-		stat_ready = false;
++		vcap->stat_ready = false;
++		memset(&vcap->local_buf, 0, sizeof(vcap->local_buf));
+ 		/*
+ 		 * All stats profile starts from the PRE statistics, except the
+ 		 * AVERAGE POST
+ 		 */
+ 		if (vcap->stat_profile == V4L2_STAT_PROFILE_AVERAGE_POST)
+-			location = DCMIPP_P1STXCR_SRC_LOC_POST;
++			vcap->stat_location = DCMIPP_P1STXCR_SRC_LOC_POST;
+ 		else
+-			location = DCMIPP_P1STXCR_SRC_LOC_PRE;
++			vcap->stat_location = DCMIPP_P1STXCR_SRC_LOC_PRE;
+ 		/*
+ 		 * We've just started, set control registers to capture
+ 		 * AVERAGES (RGB) and leave
+@@ -778,7 +791,7 @@ static irqreturn_t dcmipp_statcap_irq_thread(int irq, void *arg)
+ 		for (i = 0; i < 3; i++)
+ 			reg_write(vcap, DCMIPP_P1STXCR(i),
+ 				  DCMIPP_P1STXCR_MODE_AVERAGE |
+-				  dcmipp_statcap_get_src(location, i) |
++				  dcmipp_statcap_get_src(vcap->stat_location, i) |
+ 				  vcap->avg_filter << DCMIPP_P1STXCR_BINS_SHIFT |
+ 				  DCMIPP_P1STXCR_ENABLE);
+ 		break;
+@@ -788,14 +801,20 @@ static irqreturn_t dcmipp_statcap_irq_thread(int irq, void *arg)
+ 		for (i = 0; i < 3; i++)
+ 			reg_write(vcap, DCMIPP_P1STXCR(i),
+ 				  DCMIPP_P1STXCR_MODE_BINS |
+-				  dcmipp_statcap_get_src(location, vcap->bin_comp) |
++				  dcmipp_statcap_get_src(vcap->stat_location, vcap->bin_comp) |
+ 				  0 << DCMIPP_P1STXCR_BINS_SHIFT |
+ 				  DCMIPP_P1STXCR_ENABLE);
+ 
+ 		if (vcap->prev_capture_state == PHY_BIN_3_SHA_AV_RGB) {
++			/* The data capture refer to the previous location */
++			avr_bins = !vcap->stat_location == DCMIPP_P1STXCR_SRC_LOC_PRE ?
++					&vcap->local_buf.pre : &vcap->local_buf.post;
+ 			/* Accumulators contains the 4th set of BINS */
+ 			for (i = 0; i < 3; i++)
+ 				avr_bins->bins[i + 9] = reg_read(vcap, DCMIPP_P1STXSR(i));
++			/* By the time we get the 4th POST BINS, stat_location is again in PRE */
++			if (vcap->stat_location == DCMIPP_P1STXCR_SRC_LOC_PRE)
++				vcap->stat_ready = true;
+ 		}
+ 		break;
+ 
+@@ -804,12 +823,12 @@ static irqreturn_t dcmipp_statcap_irq_thread(int irq, void *arg)
+ 		for (i = 0; i < 3; i++)
+ 			reg_write(vcap, DCMIPP_P1STXCR(i),
+ 				  DCMIPP_P1STXCR_MODE_BINS |
+-				  dcmipp_statcap_get_src(location, vcap->bin_comp) |
++				  dcmipp_statcap_get_src(vcap->stat_location, vcap->bin_comp) |
+ 				  1 << DCMIPP_P1STXCR_BINS_SHIFT |
+ 				  DCMIPP_P1STXCR_ENABLE);
+ 
+ 		/* Accumulators contains the AVERAGES (RGB) */
+-		dcmipp_statcap_read_avg_stats(vcap, location);
++		dcmipp_statcap_read_avg_stats(vcap);
+ 		break;
+ 
+ 	case PHY_BIN_1_SHA_BIN_2:
+@@ -817,7 +836,7 @@ static irqreturn_t dcmipp_statcap_irq_thread(int irq, void *arg)
+ 		for (i = 0; i < 3; i++)
+ 			reg_write(vcap, DCMIPP_P1STXCR(i),
+ 				  DCMIPP_P1STXCR_MODE_BINS |
+-				  dcmipp_statcap_get_src(location, vcap->bin_comp) |
++				  dcmipp_statcap_get_src(vcap->stat_location, vcap->bin_comp) |
+ 				  2 << DCMIPP_P1STXCR_BINS_SHIFT |
+ 				  DCMIPP_P1STXCR_ENABLE);
+ 
+@@ -831,7 +850,7 @@ static irqreturn_t dcmipp_statcap_irq_thread(int irq, void *arg)
+ 		for (i = 0; i < 3; i++)
+ 			reg_write(vcap, DCMIPP_P1STXCR(i),
+ 				  DCMIPP_P1STXCR_MODE_BINS |
+-				  dcmipp_statcap_get_src(location, vcap->bin_comp) |
++				  dcmipp_statcap_get_src(vcap->stat_location, vcap->bin_comp) |
+ 				  3 << DCMIPP_P1STXCR_BINS_SHIFT |
+ 				  DCMIPP_P1STXCR_ENABLE);
+ 
+@@ -846,7 +865,7 @@ static irqreturn_t dcmipp_statcap_irq_thread(int irq, void *arg)
+ 			/* Usage of !location is on purpose to switch to the other location */
+ 			reg_write(vcap, DCMIPP_P1STXCR(i),
+ 				  DCMIPP_P1STXCR_MODE_AVERAGE |
+-				  dcmipp_statcap_get_src(!location, i) |
++				  dcmipp_statcap_get_src(!vcap->stat_location, i) |
+ 				  vcap->avg_filter << DCMIPP_P1STXCR_BINS_SHIFT |
+ 				  DCMIPP_P1STXCR_ENABLE);
+ 
+@@ -855,18 +874,19 @@ static irqreturn_t dcmipp_statcap_irq_thread(int irq, void *arg)
+ 			avr_bins->bins[i + 6] = reg_read(vcap, DCMIPP_P1STXSR(i));
+ 		break;
+ 
+-	case PHY_AV_RGB_SHA_AV_RGB:
++	case AV_READ:
+ 		/* State used for the AVERAGE PRE capture mode */
+-		dcmipp_statcap_read_avg_stats(vcap, location);
++		dcmipp_statcap_read_avg_stats(vcap);
++		break;
++
++	default:
+ 		break;
+ 	}
+ 
+ 	/* If a full capture cycle has been done, output data to a buffer */
+-	if (stat_ready)
++	if (vcap->stat_ready)
+ 		dcmipp_statcap_buffer_done(vcap);
+ 
+-	spin_unlock_irq(&vcap->irqlock);
+-
+ 	/* Update the capture_state & prev_capture_state */
+ 	switch (vcap->stat_profile) {
+ 	case V4L2_STAT_PROFILE_FULL:
+@@ -874,9 +894,7 @@ static irqreturn_t dcmipp_statcap_irq_thread(int irq, void *arg)
+ 		if (vcap->capture_state < PHY_BIN_3_SHA_AV_RGB) {
+ 			vcap->capture_state++;
+ 		} else {
+-			if (location == DCMIPP_P1STXCR_SRC_LOC_POST)
+-				stat_ready = true;
+-			location = !location;
++			vcap->stat_location = !vcap->stat_location;
+ 			vcap->capture_state = PHY_AV_RGB_SHA_BIN_0;
+ 		}
+ 		break;
+@@ -884,12 +902,16 @@ static irqreturn_t dcmipp_statcap_irq_thread(int irq, void *arg)
+ 	case V4L2_STAT_PROFILE_AVERAGE_PRE:
+ 	case V4L2_STAT_PROFILE_AVERAGE_POST:
+ 		if (vcap->capture_state == COLD_START) {
+-			vcap->capture_state = PHY_AV_RGB_SHA_AV_RGB;
+-			stat_ready = true;
++			vcap->capture_state = PHY_AV_RGB;
++		} else if (vcap->capture_state == PHY_AV_RGB) {
++			vcap->capture_state = AV_READ;
++			vcap->stat_ready = true;
+ 		}
+ 		break;
+ 	}
+ 
++	spin_unlock_irq(&vcap->irqlock);
++
+ 	return IRQ_HANDLED;
+ }
+ 
+diff --git a/drivers/memory/stm32-omi.c b/drivers/memory/stm32-omi.c
+index ea052290fb20..b09b8fb85952 100644
+--- a/drivers/memory/stm32-omi.c
++++ b/drivers/memory/stm32-omi.c
+@@ -92,13 +92,15 @@ int stm32_omi_wait_cmd(struct stm32_omi *omi)
+ 	writel_relaxed(cr | CR_TCIE | CR_TEIE, regs_base + OSPI_CR);
+ 
+ 	if (!wait_for_completion_timeout(&omi->data_completion,
+-				msecs_to_jiffies(STM32_COMP_TIMEOUT_MS))) {
++				msecs_to_jiffies(STM32_COMP_TIMEOUT_MS)))
+ 		err = -ETIMEDOUT;
+-	} else {
+-		sr = readl_relaxed(regs_base + OSPI_SR);
+-		if (sr & SR_TEF)
+-			err = -EIO;
+-	}
++
++	sr = readl_relaxed(regs_base + OSPI_SR);
++	if (sr & SR_TCF)
++		/* avoid false timeout */
++		err = 0;
++	if (sr & SR_TEF)
++		err = -EIO;
+ 
+ out:
+ 	/* clear flags */
+@@ -139,7 +141,6 @@ static irqreturn_t stm32_omi_irq(int irq, void *dev_id)
+ 
+ 	if (sr & (SR_TEF | SR_TCF)) {
+ 		/* disable irq */
+-		cr = readl_relaxed(regs_base + OSPI_CR);
+ 		cr &= ~CR_TCIE & ~CR_TEIE;
+ 		writel_relaxed(cr, regs_base + OSPI_CR);
+ 		complete(&omi->data_completion);
+diff --git a/drivers/mmc/host/mmci_stm32_sdmmc.c b/drivers/mmc/host/mmci_stm32_sdmmc.c
+index d18e50e2e39e..503cfcaea98d 100644
+--- a/drivers/mmc/host/mmci_stm32_sdmmc.c
++++ b/drivers/mmc/host/mmci_stm32_sdmmc.c
+@@ -535,10 +535,20 @@ static int sdmmc_dlyb_mp15_prepare(struct mmci_host *host)
+ static int sdmmc_dlyb_mp25_enable(struct sdmmc_dlyb *dlyb)
+ {
+ 	u32 cr, sr;
++	int ret;
+ 
+ 	cr = readl_relaxed(dlyb->base + SYSCFG_DLYBSD_CR);
+-	cr |= DLYBSD_CR_EN;
+ 
++	cr &= ~DLYBSD_CR_EN;
++	writel_relaxed(cr, dlyb->base + SYSCFG_DLYBSD_CR);
++
++	ret = readl_relaxed_poll_timeout(dlyb->base + SYSCFG_DLYBSD_SR,
++					 sr, !(sr & DLYBSD_SR_LOCK), 1,
++					 DLYBSD_TIMEOUT_1S_IN_US);
++	if (ret)
++		return ret;
++
++	cr |= DLYBSD_CR_EN;
+ 	writel_relaxed(cr, dlyb->base + SYSCFG_DLYBSD_CR);
+ 
+ 	return readl_relaxed_poll_timeout(dlyb->base + SYSCFG_DLYBSD_SR,
+diff --git a/drivers/mtd/nand/raw/stm32_fmc2_nand.c b/drivers/mtd/nand/raw/stm32_fmc2_nand.c
+index fb9f6f90d0a3..1dae2a2e1dcb 100644
+--- a/drivers/mtd/nand/raw/stm32_fmc2_nand.c
++++ b/drivers/mtd/nand/raw/stm32_fmc2_nand.c
+@@ -272,6 +272,7 @@ struct stm32_fmc2_nfc {
+ 	struct sg_table dma_data_sg;
+ 	struct sg_table dma_ecc_sg;
+ 	u8 *ecc_buf;
++	dma_addr_t dma_ecc_addr;
+ 	int dma_ecc_len;
+ 	u32 tx_dma_max_burst;
+ 	u32 rx_dma_max_burst;
+@@ -902,17 +903,10 @@ static int stm32_fmc2_nfc_xfer(struct nand_chip *chip, const u8 *buf,
+ 
+ 	if (!write_data && !raw) {
+ 		/* Configure DMA ECC status */
+-		p = nfc->ecc_buf;
+ 		for_each_sg(nfc->dma_ecc_sg.sgl, sg, eccsteps, s) {
+-			sg_set_buf(sg, p, nfc->dma_ecc_len);
+-			p += nfc->dma_ecc_len;
+-		}
+-
+-		ret = dma_map_sg(nfc->dev, nfc->dma_ecc_sg.sgl,
+-				 eccsteps, dma_data_dir);
+-		if (!ret) {
+-			ret = -EIO;
+-			goto err_unmap_data;
++			sg_dma_address(sg) = nfc->dma_ecc_addr +
++					     s * nfc->dma_ecc_len;
++			sg_dma_len(sg) = nfc->dma_ecc_len;
+ 		}
+ 
+ 		desc_ecc = dmaengine_prep_slave_sg(nfc->dma_ecc_ch,
+@@ -921,7 +915,7 @@ static int stm32_fmc2_nfc_xfer(struct nand_chip *chip, const u8 *buf,
+ 						   DMA_PREP_INTERRUPT);
+ 		if (!desc_ecc) {
+ 			ret = -ENOMEM;
+-			goto err_unmap_ecc;
++			goto err_unmap_data;
+ 		}
+ 
+ 		reinit_completion(&nfc->dma_ecc_complete);
+@@ -929,7 +923,7 @@ static int stm32_fmc2_nfc_xfer(struct nand_chip *chip, const u8 *buf,
+ 		desc_ecc->callback_param = &nfc->dma_ecc_complete;
+ 		ret = dma_submit_error(dmaengine_submit(desc_ecc));
+ 		if (ret)
+-			goto err_unmap_ecc;
++			goto err_unmap_data;
+ 
+ 		dma_async_issue_pending(nfc->dma_ecc_ch);
+ 	}
+@@ -949,7 +943,7 @@ static int stm32_fmc2_nfc_xfer(struct nand_chip *chip, const u8 *buf,
+ 		if (!write_data && !raw)
+ 			dmaengine_terminate_all(nfc->dma_ecc_ch);
+ 		ret = -ETIMEDOUT;
+-		goto err_unmap_ecc;
++		goto err_unmap_data;
+ 	}
+ 
+ 	/* Wait DMA data transfer completion */
+@@ -969,11 +963,6 @@ static int stm32_fmc2_nfc_xfer(struct nand_chip *chip, const u8 *buf,
+ 		}
+ 	}
+ 
+-err_unmap_ecc:
+-	if (!write_data && !raw)
+-		dma_unmap_sg(nfc->dev, nfc->dma_ecc_sg.sgl,
+-			     eccsteps, dma_data_dir);
+-
+ err_unmap_data:
+ 	dma_unmap_sg(nfc->dev, nfc->dma_data_sg.sgl, eccsteps, dma_data_dir);
+ 
+@@ -1610,7 +1599,8 @@ static int stm32_fmc2_nfc_dma_setup(struct stm32_fmc2_nfc *nfc)
+ 		return ret;
+ 
+ 	/* Allocate a buffer to store ECC status registers */
+-	nfc->ecc_buf = devm_kzalloc(nfc->dev, FMC2_MAX_ECC_BUF_LEN, GFP_KERNEL);
++	nfc->ecc_buf = dmam_alloc_coherent(nfc->dev, FMC2_MAX_ECC_BUF_LEN,
++					   &nfc->dma_ecc_addr, GFP_KERNEL);
+ 	if (!nfc->ecc_buf)
+ 		return -ENOMEM;
+ 
+diff --git a/drivers/pci/controller/dwc/pcie-stm32-ep.c b/drivers/pci/controller/dwc/pcie-stm32-ep.c
+index 53a5acf839ab..d5a0e0288a72 100644
+--- a/drivers/pci/controller/dwc/pcie-stm32-ep.c
++++ b/drivers/pci/controller/dwc/pcie-stm32-ep.c
+@@ -240,25 +240,24 @@ static void stm32_pcie_perst_deassert(struct dw_pcie *pci)
+ 		return;
+ 	}
+ 
+-	ret = stm32_pcie_enable_link(pci);
++	ret = dw_pcie_ep_init_complete(ep);
+ 	if (ret) {
+-		dev_err(dev, "PCIe Cannot establish link: %d\n", ret);
++		dev_err(dev, "Failed to complete initialization: %d\n", ret);
+ 		stm32_pcie_disable_resources(stm32_pcie);
+ 		pm_runtime_put_sync(dev);
+ 		return;
+ 	}
+ 
+-	ret = dw_pcie_ep_init_complete(ep);
++	dw_pcie_ep_init_notify(ep);
++
++	ret = stm32_pcie_enable_link(pci);
+ 	if (ret) {
+-		dev_err(dev, "Failed to complete initialization: %d\n", ret);
+-		stm32_pcie_disable_link(pci);
++		dev_err(dev, "PCIe Cannot establish link: %d\n", ret);
+ 		stm32_pcie_disable_resources(stm32_pcie);
+ 		pm_runtime_put_sync(dev);
+ 		return;
+ 	}
+ 
+-	dw_pcie_ep_init_notify(ep);
+-
+ 	stm32_pcie->link_status = STM32_PCIE_EP_LINK_ENABLED;
+ }
+ 
+diff --git a/drivers/spi/spi-stm32-ospi.c b/drivers/spi/spi-stm32-ospi.c
+index 8a759c694fe4..b4e9f737554c 100644
+--- a/drivers/spi/spi-stm32-ospi.c
++++ b/drivers/spi/spi-stm32-ospi.c
+@@ -200,8 +200,13 @@ static int stm32_ospi_wait_poll_status(struct stm32_ospi *ospi,
+ 	writel_relaxed(cr | CR_SMIE, regs_base + OSPI_CR);
+ 
+ 	if (!wait_for_completion_timeout(&omi->match_completion,
+-					 msecs_to_jiffies(ospi->status_timeout)))
+-		return -ETIMEDOUT;
++					 msecs_to_jiffies(ospi->status_timeout))) {
++		u32 sr = readl_relaxed(regs_base + OSPI_SR);
++
++		/* Avoid false timeout */
++		if (!(sr & SR_SMF))
++			return -ETIMEDOUT;
++	}
+ 
+ 	writel_relaxed(FCR_CSMF, regs_base + OSPI_FCR);
+ 
+@@ -282,6 +287,10 @@ static int stm32_ospi_send(struct spi_device *spi, const struct spi_mem_op *op)
+ 	if (op->cmd.dtr) {
+ 		ccr |= CCR_IDTR;
+ 		ccr |= CCR_DQSE;
++
++		if (FIELD_GET(DCR2_PRESC_MASK,
++			      readl_relaxed(regs_base + OSPI_DCR2)))
++			tcr |= TCR_DHQC;
+ 	}
+ 
+ 	if (op->addr.dtr)
+@@ -567,12 +576,9 @@ static int stm32_ospi_dtr_calibration(struct stm32_ospi *ospi)
+ 	writel_relaxed(flash->dcr_reg, regs_base + OSPI_DCR1);
+ 
+ 	prescaler = FIELD_GET(DCR2_PRESC_MASK,
+-			      readl(regs_base + OSPI_DCR2));
++			      readl_relaxed(regs_base + OSPI_DCR2));
+ 	bus_freq = DIV_ROUND_UP(omi->clk_rate, prescaler + 1);
+ 
+-	if (prescaler)
+-		writel_relaxed(TCR_DHQC, regs_base + OSPI_TCR);
+-
+ 	if (bus_freq <= STM32_DLYB_FREQ_THRESHOLD) {
+ 		bypass_mode = true;
+ 		period_ps = NSEC_PER_SEC / (bus_freq / 1000);
+diff --git a/drivers/spi/spi-stm32-qspi.c b/drivers/spi/spi-stm32-qspi.c
+index 9131660c1afb..11cd7f20a80b 100644
+--- a/drivers/spi/spi-stm32-qspi.c
++++ b/drivers/spi/spi-stm32-qspi.c
+@@ -350,7 +350,7 @@ static int stm32_qspi_wait_poll_status(struct stm32_qspi *qspi)
+ 
+ static int stm32_qspi_get_mode(u8 buswidth)
+ {
+-	if (buswidth == 4)
++	if (buswidth >= 4)
+ 		return CCR_BUSWIDTH_4;
+ 
+ 	return buswidth;
+@@ -654,9 +654,7 @@ static int stm32_qspi_setup(struct spi_device *spi)
+ 		return -EINVAL;
+ 
+ 	mode = spi->mode & (SPI_TX_OCTAL | SPI_RX_OCTAL);
+-	if ((mode == SPI_TX_OCTAL || mode == SPI_RX_OCTAL) ||
+-	    ((mode == (SPI_TX_OCTAL | SPI_RX_OCTAL)) &&
+-	    gpiod_count(qspi->dev, "cs") == -ENOENT)) {
++	if (mode && gpiod_count(qspi->dev, "cs") == -ENOENT) {
+ 		dev_err(qspi->dev, "spi-rx-bus-width\\/spi-tx-bus-width\\/cs-gpios\n");
+ 		dev_err(qspi->dev, "configuration not supported\n");
+ 
+@@ -677,10 +675,10 @@ static int stm32_qspi_setup(struct spi_device *spi)
+ 	qspi->cr_reg = CR_APMS | 3 << CR_FTHRES_SHIFT | CR_SSHIFT | CR_EN;
+ 
+ 	/*
+-	 * Dual flash mode is only enable in case SPI_TX_OCTAL and SPI_TX_OCTAL
+-	 * are both set in spi->mode and "cs-gpios" properties is found in DT
++	 * Dual flash mode is only enable in case SPI_TX_OCTAL or SPI_RX_OCTAL
++	 * is set in spi->mode and "cs-gpios" properties is found in DT
+ 	 */
+-	if (mode == (SPI_TX_OCTAL | SPI_RX_OCTAL)) {
++	if (mode) {
+ 		qspi->cr_reg |= CR_DFM;
+ 		dev_dbg(qspi->dev, "Dual flash mode enable");
+ 	}
+diff --git a/drivers/spi/spi-stm32.c b/drivers/spi/spi-stm32.c
+index df80c39d25e9..0444041d3d07 100644
+--- a/drivers/spi/spi-stm32.c
++++ b/drivers/spi/spi-stm32.c
+@@ -1305,7 +1305,8 @@ static int stm32h7_spi_transfer_one_poll(struct stm32_spi *spi)
+ 	sr = readl_relaxed(spi->base + STM32H7_SPI_SR);
+ 	/* Keep writing / reading while waiting for the end of transfer */
+ 	while (spi->tx_len || spi->rx_len || !(sr & STM32H7_SPI_SR_EOT)) {
+-		if (spi->rx_len && (sr & (STM32H7_SPI_SR_RXP | STM32H7_SPI_SR_RXWNE)))
++		if (spi->rx_len && (sr & (STM32H7_SPI_SR_RXP | STM32H7_SPI_SR_RXWNE |
++					  STM32H7_SPI_SR_RXPLVL)))
+ 			stm32h7_spi_read_rxfifo(spi);
+ 
+ 		if (spi->tx_len && (sr & STM32H7_SPI_SR_TXP))
+diff --git a/drivers/spi/spi.c b/drivers/spi/spi.c
+index f144456088cd..abbaa41fadb9 100644
+--- a/drivers/spi/spi.c
++++ b/drivers/spi/spi.c
+@@ -3990,7 +3990,8 @@ static int __spi_validate(struct spi_device *spi, struct spi_message *message)
+ 				return -EINVAL;
+ 			if (xfer->tx_nbits != SPI_NBITS_SINGLE &&
+ 				xfer->tx_nbits != SPI_NBITS_DUAL &&
+-				xfer->tx_nbits != SPI_NBITS_QUAD)
++				xfer->tx_nbits != SPI_NBITS_QUAD &&
++				xfer->tx_nbits != SPI_NBITS_OCTAL)
+ 				return -EINVAL;
+ 			if ((xfer->tx_nbits == SPI_NBITS_DUAL) &&
+ 				!(spi->mode & (SPI_TX_DUAL | SPI_TX_QUAD)))
+@@ -4005,7 +4006,8 @@ static int __spi_validate(struct spi_device *spi, struct spi_message *message)
+ 				return -EINVAL;
+ 			if (xfer->rx_nbits != SPI_NBITS_SINGLE &&
+ 				xfer->rx_nbits != SPI_NBITS_DUAL &&
+-				xfer->rx_nbits != SPI_NBITS_QUAD)
++				xfer->rx_nbits != SPI_NBITS_QUAD &&
++				xfer->rx_nbits != SPI_NBITS_OCTAL)
+ 				return -EINVAL;
+ 			if ((xfer->rx_nbits == SPI_NBITS_DUAL) &&
+ 				!(spi->mode & (SPI_RX_DUAL | SPI_RX_QUAD)))
+diff --git a/include/linux/spi/spi.h b/include/linux/spi/spi.h
+index 4034838be9d0..344655dc2a19 100644
+--- a/include/linux/spi/spi.h
++++ b/include/linux/spi/spi.h
+@@ -986,11 +986,12 @@ struct spi_transfer {
+ 	unsigned	dummy_data:1;
+ 	unsigned	cs_off:1;
+ 	unsigned	cs_change:1;
+-	unsigned	tx_nbits:3;
+-	unsigned	rx_nbits:3;
++	unsigned	tx_nbits:4;
++	unsigned	rx_nbits:4;
+ #define	SPI_NBITS_SINGLE	0x01 /* 1bit transfer */
+ #define	SPI_NBITS_DUAL		0x02 /* 2bits transfer */
+ #define	SPI_NBITS_QUAD		0x04 /* 4bits transfer */
++#define	SPI_NBITS_OCTAL		0x08 /* 8bits transfer */
+ 	u8		bits_per_word;
+ 	struct spi_delay	delay;
+ 	struct spi_delay	cs_change_delay;
+-- 
+2.25.1
+

@@ -17,10 +17,11 @@ SRC_URI[kernel.sha256sum] = "d150d2d9d416877668d8b56f75759f166168d192419eefaa942
 
 SRC_URI += " \
     file://${LINUX_VERSION}/${LINUX_VERSION}${LINUX_SUBVERSION}/0001-v6.1-stm32mp-r2.patch \
+    file://${LINUX_VERSION}/${LINUX_VERSION}${LINUX_SUBVERSION}/0002-v6.1-stm32mp-r2.1.patch \
     "
 
 LINUX_TARGET = "stm32mp"
-LINUX_RELEASE = "r2"
+LINUX_RELEASE = "r2.1"
 
 PV = "${LINUX_VERSION}${LINUX_SUBVERSION}-${LINUX_TARGET}-${LINUX_RELEASE}"
 
@@ -37,7 +38,7 @@ S = "${WORKDIR}/${LINUX_TARBASE}"
 BBCLASSEXTEND = "devupstream:target"
 
 SRC_URI:class-devupstream = "git://github.com/STMicroelectronics/linux.git;protocol=https;branch=${ARCHIVER_ST_BRANCH}"
-SRCREV:class-devupstream = "7084443b1f4255944dc48190b3e95127e692dc2a"
+SRCREV:class-devupstream = "5d0627a4ac41de5f650d626898d02bd24a1d69ec"
 #FIXME force the PV to avoid build issue:
 #  do_package: ExpansionError('SRCPV', '${@bb.fetch2.get_srcrev(d)}', FetchError('SRCREV was used yet no valid SCM was found in SRC_URI', None))
 PV:class-devupstream = "${LINUX_VERSION}${LINUX_SUBVERSION}-${LINUX_TARGET}.${SRCPV}"
