@@ -302,9 +302,11 @@ STM32MP_UBI_VOLUME_nand_4_256_1024 ?= "\
     "
 STM32MP_UBI_VOLUME_nand_4_256_512 ?= "\
     ${STM32MP_MULTIUBI_UENV1_NAME},${STM32MP_MULTIUBI_UENV1_LABEL},${STM32MP_MULTIUBI_UENV1_SIZE},empty \
+    ${STM32MP_MULTIUBI_UENV2_NAME},${STM32MP_MULTIUBI_UENV2_LABEL},${STM32MP_MULTIUBI_UENV2_SIZE},empty \
     ${@' '.join(['%s' % partImage2partConfig(d, config) for config in d.getVar('PARTITIONS_LIST').split()])} \
     "
 STM32MP_UBI_VOLUME_nand_2_128_256 ?= "\
     ${STM32MP_MULTIUBI_UENV1_NAME},${STM32MP_MULTIUBI_UENV1_LABEL},${STM32MP_MULTIUBI_UENV1_SIZE},empty \
+    ${STM32MP_MULTIUBI_UENV2_NAME},${STM32MP_MULTIUBI_UENV2_LABEL},${STM32MP_MULTIUBI_UENV2_SIZE},empty \
     ${@' '.join(['%s' % partImage2partConfig(d, config) for config in d.getVar('PARTITIONS_LIST').split()])} \
     "
